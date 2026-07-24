@@ -45,13 +45,17 @@ struct HomeView: View {
                 jackpotCard(draw)
 
                 VStack(spacing: 0) {
-                    DetailRow(title: "期數", value: "第 \(draw.drawNumber) 期")
+                    DetailRow(title: "攪珠期數", value: draw.drawNumber)
                     Divider()
-                    DetailRow(title: "攪珠日期", value: DrawDateFormatter.display(draw.drawDate))
+                    DetailRow(
+                        title: "攪珠日期",
+                        value: DrawDateFormatter.hongKongDrawDate(draw.drawDate)
+                    )
                     Divider()
-                    DetailRow(title: "截止售票", value: DrawDateFormatter.display(draw.salesCloseAt))
-                    Divider()
-                    DetailRow(title: "最近更新", value: DrawDateFormatter.display(draw.updatedAt))
+                    DetailRow(
+                        title: "最近更新",
+                        value: DrawDateFormatter.hongKongTimestamp(draw.updatedAt)
+                    )
                     Divider()
                     DetailRow(title: "通知門檻", value: settingsModel.formattedThreshold)
                 }
@@ -140,12 +144,52 @@ private enum DrawAmountFormatter {
 
 /// Formats ISO 8601 timestamps for the user's current locale and time zone.
 private enum DrawDateFormatter {
-    /// Converts an API timestamp to a compact local date and time.
-    static func display(_ value: String) -> String {
-        guard let date = ISO8601DateFormatter().date(from: value) else {
+    private static let iso8601Formatter = ISO8601DateFormatter()
+
+    private static let fractionalISO8601Formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let hongKongDrawDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "zh_HK")
+        formatter.timeZone = TimeZone(identifier: "Asia/Hong_Kong")
+        formatter.dateFormat = "dd/MM/yyyy (EEEE)"
+        return formatter
+    }()
+
+    private static let hongKongTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Asia/Hong_Kong")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
+
+    /// Displays a draw timestamp as a Hong Kong date with a Traditional Chinese weekday.
+    static func hongKongDrawDate(_ value: String) -> String {
+        guard let date = parseISO8601(value) else {
             return value
         }
 
-        return date.formatted(date: .abbreviated, time: .shortened)
+        return hongKongDrawDateFormatter.string(from: date)
+    }
+
+    /// Displays a Worker update timestamp in a fixed Hong Kong date-time format.
+    static func hongKongTimestamp(_ value: String) -> String {
+        guard let date = parseISO8601(value) else {
+            return value
+        }
+
+        return hongKongTimestampFormatter.string(from: date)
+    }
+
+    /// Parses the ISO 8601 variants returned by the Worker and HKJC.
+    private static func parseISO8601(_ value: String) -> Date? {
+        fractionalISO8601Formatter.date(from: value) ?? iso8601Formatter.date(from: value)
     }
 }

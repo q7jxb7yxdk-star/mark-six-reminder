@@ -6,7 +6,7 @@ import UserNotifications
 @MainActor
 @Observable
 final class SettingsViewModel {
-    static let presetThresholds = [16_000_000, 20_000_000, 30_000_000]
+    static let presetThresholds = [8_000_000, 13_000_000]
 
     private(set) var threshold: Int
     private(set) var notificationsEnabled: Bool
@@ -32,7 +32,7 @@ final class SettingsViewModel {
         self.apiClient = apiClient
         self.defaults = defaults
 
-        threshold = defaults.object(forKey: PreferenceKey.threshold) as? Int ?? 20_000_000
+        threshold = defaults.object(forKey: PreferenceKey.threshold) as? Int ?? 13_000_000
         notificationsEnabled = defaults.object(forKey: PreferenceKey.enabled) as? Bool ?? true
 
         if let storedId = defaults.string(forKey: PreferenceKey.installationId),
