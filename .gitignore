@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Xcode local state and build products
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Cloudflare Worker dependencies and local state
+Worker/node_modules/
+Worker/.wrangler/
+Worker/.dev.vars
+Worker/.dev.vars.*
+
+# Local Worker build output
+Worker/dist/
