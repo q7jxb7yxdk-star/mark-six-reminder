@@ -11,6 +11,7 @@ final class SettingsViewModel {
     private(set) var threshold: Int
     private(set) var notificationsEnabled: Bool
     private(set) var isSynchronizing = false
+    private(set) var isRegisteringDevice = false
     private(set) var statusMessage: String?
 
     @ObservationIgnored
@@ -46,7 +47,14 @@ final class SettingsViewModel {
 
         notificationManager.deviceTokenDidChange = { [weak self] _ in
             Task { @MainActor [weak self] in
+                self?.isRegisteringDevice = false
                 await self?.synchronizeIfPossible()
+            }
+        }
+        notificationManager.registrationDidFail = { [weak self] message in
+            Task { @MainActor [weak self] in
+                self?.isRegisteringDevice = false
+                self?.statusMessage = "無法註冊通知裝置：\(message)"
             }
         }
     }
@@ -54,6 +62,11 @@ final class SettingsViewModel {
     /// Exposes the current iOS authorization state for settings UI decisions.
     var authorizationStatus: UNAuthorizationStatus {
         notificationManager.authorizationStatus
+    }
+
+    /// Indicates that either APNs registration or backend synchronization is active.
+    var isBusy: Bool {
+        isRegisteringDevice || isSynchronizing
     }
 
     /// Formats the selected threshold in Hong Kong dollars.
@@ -73,6 +86,7 @@ final class SettingsViewModel {
         let granted = await notificationManager.requestAuthorization()
         if !granted {
             statusMessage = "通知權限未啟用，可稍後在 iPhone 設定中開啟。"
+            return
         }
         await synchronizeIfPossible()
     }
@@ -104,6 +118,12 @@ final class SettingsViewModel {
             return
         }
 
+        if enabled {
+            await notificationManager.refreshAuthorizationStatus()
+        } else {
+            isRegisteringDevice = false
+        }
+
         await synchronizeIfPossible()
     }
 
@@ -119,9 +139,14 @@ final class SettingsViewModel {
         }
 
         guard let deviceToken = notificationManager.deviceToken else {
+            if notificationsEnabled && hasSystemAuthorization {
+                isRegisteringDevice = true
+                statusMessage = "正在註冊通知裝置…"
+            }
             return
         }
 
+        isRegisteringDevice = false
         isSynchronizing = true
         statusMessage = nil
         defer { isSynchronizing = false }
@@ -149,6 +174,16 @@ final class SettingsViewModel {
         #else
         "production"
         #endif
+    }
+
+    /// Returns whether iOS currently permits this app to register for notifications.
+    private var hasSystemAuthorization: Bool {
+        switch authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            true
+        default:
+            false
+        }
     }
 }
 

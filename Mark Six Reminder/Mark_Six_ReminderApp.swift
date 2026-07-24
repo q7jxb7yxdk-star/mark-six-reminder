@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct Mark_Six_ReminderApp: App {
@@ -32,5 +33,6 @@ struct Mark_Six_ReminderApp: App {
                     await settingsViewModel.prepare()
                 }
         }
+        .modelContainer(for: SavedNumberEntry.self)
     }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DrawInfo, DrawSource, DrawStore } from "../src/models/draw";
+import type { DrawInfo, DrawSnapshot, DrawSource, DrawStore } from "../src/models/draw";
 import { DrawUpdateService } from "../src/services/draw-update-service";
 
 const DRAW: DrawInfo = {
@@ -18,22 +18,27 @@ const DRAW: DrawInfo = {
 
 class StubSource implements DrawSource {
   /** Returns the controlled fixture used by this unit test. */
-  async fetchCurrent(): Promise<DrawInfo> {
-    return DRAW;
+  async fetchSnapshot(): Promise<DrawSnapshot> {
+    return { current: DRAW, draws: [DRAW] };
   }
 }
 
 class RecordingStore implements DrawStore {
-  savedDraw: DrawInfo | null = null;
+  savedSnapshot: DrawSnapshot | null = null;
 
   /** Returns the draw most recently recorded by the test. */
   async getCurrent(): Promise<DrawInfo | null> {
-    return this.savedDraw;
+    return this.savedSnapshot?.current ?? null;
   }
 
-  /** Records the supplied draw without external persistence. */
-  async saveCurrent(draw: DrawInfo): Promise<void> {
-    this.savedDraw = draw;
+  /** Returns one draw from the recorded snapshot. */
+  async getById(id: string): Promise<DrawInfo | null> {
+    return this.savedSnapshot?.draws.find((draw) => draw.id === id) ?? null;
+  }
+
+  /** Records the supplied snapshot without external persistence. */
+  async saveSnapshot(snapshot: DrawSnapshot): Promise<void> {
+    this.savedSnapshot = snapshot;
   }
 }
 
@@ -44,7 +49,7 @@ describe("DrawUpdateService", () => {
 
     const result = await service.update();
 
-    expect(result).toEqual(DRAW);
-    expect(store.savedDraw).toEqual(DRAW);
+    expect(result).toEqual({ current: DRAW, draws: [DRAW] });
+    expect(store.savedSnapshot).toEqual(result);
   });
 });

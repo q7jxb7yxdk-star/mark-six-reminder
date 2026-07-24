@@ -11,13 +11,17 @@ final class NotificationManager {
 
     @ObservationIgnored
     var deviceTokenDidChange: ((String) -> Void)?
+    @ObservationIgnored
+    var registrationDidFail: ((String) -> Void)?
 
     /// Refreshes authorization state without displaying a system prompt.
     func refreshAuthorizationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         authorizationStatus = settings.authorizationStatus
 
-        if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
+        if settings.authorizationStatus == .authorized ||
+            settings.authorizationStatus == .provisional ||
+            settings.authorizationStatus == .ephemeral {
             UIApplication.shared.registerForRemoteNotifications()
         }
     }
@@ -55,6 +59,11 @@ final class NotificationManager {
         deviceToken = token
         deviceTokenDidChange?(token)
     }
+
+    /// Forwards a user-readable APNs registration failure to the settings model.
+    func receiveRegistrationError(_ message: String) {
+        registrationDidFail?(message)
+    }
 }
 
 /// Bridges UIKit application callbacks into the observable notification model.
@@ -66,10 +75,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                 notificationManager?.receiveDeviceToken(pendingDeviceToken)
                 self.pendingDeviceToken = nil
             }
+            if let pendingRegistrationError {
+                notificationManager?.receiveRegistrationError(pendingRegistrationError)
+                self.pendingRegistrationError = nil
+            }
         }
     }
 
     private var pendingDeviceToken: Data?
+    private var pendingRegistrationError: String?
 
     /// Installs the foreground notification delegate at app launch.
     func application(
@@ -92,12 +106,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    /// Logs registration failures without showing technical details to the user.
+    /// Forwards APNs registration failures so the settings page does not remain waiting silently.
     func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: any Error
     ) {
-        print("APNs registration failed: \(error.localizedDescription)")
+        let message = error.localizedDescription
+        if let notificationManager {
+            notificationManager.receiveRegistrationError(message)
+        } else {
+            pendingRegistrationError = message
+        }
     }
 
     /// Displays jackpot alerts even when the app is currently in the foreground.

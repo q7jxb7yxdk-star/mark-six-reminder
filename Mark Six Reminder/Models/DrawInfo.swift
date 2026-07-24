@@ -13,4 +13,9 @@ struct DrawInfo: Decodable, Equatable, Identifiable, Sendable {
     let specialNumber: Int?
     let updatedAt: String
     let sourceURL: String
+
+    /// Indicates whether the Worker has a complete official six-plus-special result.
+    var hasPublishedResult: Bool {
+        mainNumbers.count == 6 && specialNumber != nil
+    }
 }

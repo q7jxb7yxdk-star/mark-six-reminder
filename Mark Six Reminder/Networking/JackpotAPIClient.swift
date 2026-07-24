@@ -29,6 +29,21 @@ struct JackpotAPIClient: Sendable {
             .appending(path: "draws")
             .appending(path: "current")
 
+        return try await fetchDraw(from: url)
+    }
+
+    /// Fetches one persisted draw by its official stable identifier.
+    func draw(id: String) async throws -> DrawInfo {
+        let url = baseURL
+            .appending(path: "v1")
+            .appending(path: "draws")
+            .appending(path: id)
+
+        return try await fetchDraw(from: url)
+    }
+
+    /// Sends a bounded request and decodes the Worker's common draw envelope.
+    private func fetchDraw(from url: URL) async throws -> DrawInfo {
         var request = URLRequest(url: url)
         request.timeoutInterval = 10
         request.setValue("application/json", forHTTPHeaderField: "Accept")

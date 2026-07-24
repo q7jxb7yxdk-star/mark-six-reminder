@@ -1,4 +1,4 @@
-import type { DrawInfo, DrawStore } from "../models/draw";
+import type { DrawInfo, DrawSnapshot, DrawStore } from "../models/draw";
 
 const CURRENT_DRAW_CACHE_KEY = "draw:current";
 
@@ -44,26 +44,45 @@ export class DrawRepository implements DrawStore {
     return draw;
   }
 
-  /** Upserts the durable record before replacing the current KV snapshot. */
-  async saveCurrent(draw: DrawInfo): Promise<void> {
-    await this.database
+  /** Reads one persisted draw by its official identifier. */
+  async getById(id: string): Promise<DrawInfo | null> {
+    const row = await this.database
+      .prepare("SELECT * FROM draws WHERE id = ? LIMIT 1")
+      .bind(id)
+      .first<DrawRow>();
+
+    return row ? mapRow(row) : null;
+  }
+
+  /** Upserts every validated draw before replacing the current KV snapshot. */
+  async saveSnapshot(snapshot: DrawSnapshot): Promise<void> {
+    const statements = snapshot.draws.map((draw) => this.makeUpsertStatement(draw));
+    await this.database.batch(statements);
+    if (snapshot.current) {
+      await this.cache.put(CURRENT_DRAW_CACHE_KEY, JSON.stringify(snapshot.current));
+    }
+  }
+
+  /** Creates one bound upsert statement for an official draw. */
+  private makeUpsertStatement(draw: DrawInfo): D1PreparedStatement {
+    return this.database
       .prepare(
         `INSERT INTO draws (
-          id, draw_number, draw_date, sales_close_at,
-          estimated_first_prize_fund, jackpot, status,
-          main_numbers, special_number, updated_at, source_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          draw_number = excluded.draw_number,
-          draw_date = excluded.draw_date,
-          sales_close_at = excluded.sales_close_at,
-          estimated_first_prize_fund = excluded.estimated_first_prize_fund,
-          jackpot = excluded.jackpot,
-          status = excluded.status,
-          main_numbers = excluded.main_numbers,
-          special_number = excluded.special_number,
-          updated_at = excluded.updated_at,
-          source_url = excluded.source_url`,
+           id, draw_number, draw_date, sales_close_at,
+           estimated_first_prize_fund, jackpot, status,
+           main_numbers, special_number, updated_at, source_url
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           draw_number = excluded.draw_number,
+           draw_date = excluded.draw_date,
+           sales_close_at = excluded.sales_close_at,
+           estimated_first_prize_fund = excluded.estimated_first_prize_fund,
+           jackpot = excluded.jackpot,
+           status = excluded.status,
+           main_numbers = excluded.main_numbers,
+           special_number = excluded.special_number,
+           updated_at = excluded.updated_at,
+           source_url = excluded.source_url`,
       )
       .bind(
         draw.id,
@@ -77,10 +96,7 @@ export class DrawRepository implements DrawStore {
         draw.specialNumber,
         draw.updatedAt,
         draw.sourceURL,
-      )
-      .run();
-
-    await this.cache.put(CURRENT_DRAW_CACHE_KEY, JSON.stringify(draw));
+      );
   }
 }
 

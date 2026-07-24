@@ -6,6 +6,8 @@ import { DrawUpdateService } from "./services/draw-update-service";
 import { NotificationService } from "./services/notification-service";
 import { HKJCSourceClient } from "./sources/hkjc-source-client";
 
+const JACKPOT_NOTIFICATION_CRON = "15 1 * * SUN,TUE,THU,SAT";
+
 export default {
   /** Serves cached, validated draw data to the iOS app. */
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -35,24 +37,39 @@ export default {
     }
   },
 
-  /** Refreshes the next draw from HKJC on the configured UTC schedule. */
-  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+  /** Refreshes official draws and only sends jackpot alerts on the morning schedule. */
+  async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     const repository = new DrawRepository(env.DB, env.DRAW_CACHE);
     const source = new HKJCSourceClient(env.HKJC_GRAPHQL_URL);
     const service = new DrawUpdateService(source, repository);
     const notificationRepository = new NotificationRepository(env.DB);
 
     try {
-      const draw = await service.update();
-      console.log(JSON.stringify({ event: "draw_updated", drawId: draw.id, drawNumber: draw.drawNumber }));
+      const snapshot = await service.update();
+      console.log(JSON.stringify({
+        event: "draws_updated",
+        cron: controller.cron,
+        currentDrawId: snapshot.current?.id ?? null,
+        savedDrawCount: snapshot.draws.length,
+        publishedResultCount: snapshot.draws.filter((draw) => draw.mainNumbers.length === 6).length,
+      }));
+
+      if (controller.cron !== JACKPOT_NOTIFICATION_CRON) {
+        return;
+      }
+
+      if (!snapshot.current) {
+        throw new Error("HKJC response did not include an upcoming draw for notification processing");
+      }
+
       const notificationService = new NotificationService(
         notificationRepository,
         makeAPNsClient(env),
       );
-      const notificationSummary = await notificationService.notifyEligibleUsers(draw);
+      const notificationSummary = await notificationService.notifyEligibleUsers(snapshot.current);
       console.log(JSON.stringify({
         event: "notification_run_completed",
-        drawId: draw.id,
+        drawId: snapshot.current.id,
         ...notificationSummary,
       }));
     } catch (error) {

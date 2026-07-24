@@ -46,6 +46,7 @@ struct SettingsView: View {
                     }
                 )
             )
+            .disabled(model.isSynchronizing)
 
             LabeledContent("系統權限", value: authorizationDescription)
 
@@ -55,6 +56,7 @@ struct SettingsView: View {
                         await model.requestPermission()
                     }
                 }
+                .disabled(model.isBusy)
             } else if model.authorizationStatus == .denied {
                 Button("開啟 iPhone 設定") {
                     model.openSystemSettings()
@@ -124,7 +126,7 @@ struct SettingsView: View {
 
     /// Chooses a neutral status symbol while a backend update is running.
     private var statusIcon: String {
-        model.isSynchronizing ? "arrow.trianglehead.2.clockwise" : "info.circle"
+        model.isBusy ? "arrow.trianglehead.2.clockwise" : "info.circle"
     }
 
     /// Formats preset amounts consistently with the rest of the app.

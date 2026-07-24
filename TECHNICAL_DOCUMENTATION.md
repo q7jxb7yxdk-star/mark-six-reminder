@@ -42,6 +42,7 @@ Mark Six Reminder 是非官方六合彩資訊工具，只提供資料顯示及�
 ┌────────────────────────────┐
 │ iOS App                    │
 │ - Home                     │
+│ - SwiftData saved numbers  │
 │ - Settings                 │
 │ - APNs registration       │
 └────────────────────────────┘
@@ -67,24 +68,29 @@ Mark Six Reminder 是非官方六合彩資訊工具，只提供資料顯示及�
 - SwiftUI
 - Observation (`@Observable`)
 - Structured concurrency (`async` / `await`)
+- SwiftData
 - UserNotifications 及 APNs
-
-目前尚未加入 SwiftData model；SwiftData 將在投注管理功能實作時引入。
 
 ### 4.2 App 結構
 
 ```text
 Mark Six Reminder/
+├── Components/MarkSixNumberBall.swift
 ├── App/RootTabView.swift
 ├── Configuration/AppConfiguration.swift
 ├── Features/
 │   ├── Home/
 │   │   ├── HomeView.swift
 │   │   └── HomeViewModel.swift
+│   ├── RandomNumbers/
+│   │   ├── RandomNumbersView.swift
+│   │   └── RandomNumbersViewModel.swift
 │   └── Settings/
 │       ├── SettingsView.swift
 │       └── SettingsViewModel.swift
-├── Models/DrawInfo.swift
+├── Models/
+│   ├── DrawInfo.swift
+│   └── SavedNumberEntry.swift
 ├── Networking/
 │   ├── JackpotAPIClient.swift
 │   └── NotificationAPIClient.swift
@@ -104,11 +110,11 @@ Mark Six Reminder/
 - 累積多寶（有值時）
 - 期數
 - 攪珠日期
-- 截止售票時間
 - 最近更新時間
 - 用戶目前通知門檻
+- 已儲存號碼及相應期數的官方核對結果
 
-首次進入只自動載入一次；用戶可使用 toolbar 或 pull-to-refresh 重新讀取。未設定 API URL、沒有資料或 request 失敗時，頁面顯示可重試錯誤狀態，不使用假資料。
+首次進入首頁時自動載入；App 每次由背景返回前景時亦會自動更新目前攪珠及所有已儲存期數的結果。若 App 一直停留在前景，首頁會只針對尚未有完整結果的已儲存攪珠日期建立等待 Task，在香港時間 21:46 自動更新，仍未有結果時於 22:16 後備重試。Task 不會輪詢，進入背景或結果已完整時會自動取消。首頁不設獨立 toolbar 按鈕，但保留 pull-to-refresh 作手動後備。未設定 API URL、沒有資料或 request 失敗時，頁面顯示可重試錯誤狀態，不使用假資料。
 
 ### 4.5 設定及本機持久化
 
@@ -129,10 +135,35 @@ Mark Six Reminder/
 1. App 讀取 `UNNotificationSettings`。
 2. 已授權時呼叫 `registerForRemoteNotifications()`。
 3. `AppDelegate` 接收 APNs device token。
-4. `NotificationManager` 轉換為 64 字元小寫 hexadecimal token。
+4. `NotificationManager` 轉換為小寫 hexadecimal token。實體裝置通常是 64 字元；Simulator 可能回傳較長 token。
 5. `SettingsViewModel` 把 installation ID、token、門檻、enabled 及 APNs environment 傳送到 Worker。
 
 Debug build 註冊為 `sandbox`，Release build 註冊為 `production`。Worker 會依每筆訂閱選擇相應 APNs gateway。
+設定頁在等待 token 時顯示「正在註冊通知裝置」，`AppDelegate` 亦會把 APNs 註冊失敗傳回畫面，避免操作看似沒有反應。
+
+### 4.7 運財號碼
+
+`RandomNumbersViewModel` 使用 Swift 標準隨機產生器，從 1 至 49 洗牌後取首六個數值，再按小至大排列。因為來源範圍本身沒有重複值，所以結果必定是六個不重複號碼。
+
+`RandomNumbersView` 是底部 Tab Bar 的獨立頁面。首次進入時會顯示六個灰色「0」佔位球，但不會自動產生號碼；用戶必須按「產生號碼」才會取得第一組，其後可按「重新產生」取得新一組。佔位球的 `nil` 狀態與有效的 1 至 49 號碼分開處理，避免把 0 誤當成六合彩號碼。
+
+用戶按「儲存號碼」時，App 先讀取目前下一期攪珠，把官方 `drawID`、期數、日期及六個號碼寫入本機 `SavedNumberEntry`。同一期可保存多組號碼，但完全相同的一組不會重複建立。現有六個整數欄位繼續保留，確保舊 SwiftData 記錄可向後兼容；新記錄另以簡單逗號分隔文字保存原始選號及玩法。這些號碼不會上傳到 Worker。
+
+首頁以 SwiftData `@Query` 顯示已儲存號碼，並呼叫 `GET /v1/draws/{drawID}` 讀取該期官方結果。`SavedNumbersSection` 按 `drawID` 把多組號碼分組，每一期只顯示一次六個官方正選號碼及特別號碼，再按儲存先後把選擇標示為「第 1 組」、「第 2 組」等並逐一核對。每組命中的球以黃色邊框標示，並獨立顯示正選命中數目及是否中特別號碼。未公布結果時顯示「等待官方攪珠結果」。
+
+`MarkSixNumberBall` 是可重用的 SwiftUI 元件，按六合彩標準號碼分組顯示紅、藍或綠球。元件以 SwiftUI 漸層、白色中央區域及黑色數字自行繪製，不包含或下載香港賽馬會的 SVG、Logo 或其他圖片資產，並為 VoiceOver 提供球色及號碼標籤。
+
+### 4.8 自選號碼
+
+`CustomNumbersView` 是底部 Tab Bar 的獨立頁面，重用 `MarkSixNumberBall` 顯示 1 至 49。`CustomNumbersViewModel` 依目前玩法管理選取狀態：
+
+- 單式：必須選擇 6 個不同號碼。
+- 複式：必須選擇最少 7 個不同號碼。
+- 膽拖：必須選擇 1 至 5 個膽，膽與拖合共最少 7 個，且兩組不會重複。
+
+規則依照香港賽馬會六合彩注項說明。App 只保存原始選號，不會為複式或膽拖建立大量六號碼 SwiftData 記錄；組合數使用 `n choose k` 計算。`SavedNumberEntry` 的 `selectionTypeRawValue`、`selectedNumbersStorage` 及 `bankerNumbersStorage` 保存玩法資料，舊記錄在沒有新欄位內容時自動視為單式。
+
+首頁會在同一期內逐項顯示單式、複式或膽拖。膽拖分開顯示膽及拖；官方結果公布後，所有命中球均以黃色邊框標示，並分別摘要膽與拖命中的正選數目及是否中特別號碼。App 不提交投注，也不計算或顯示投注金額。
 
 ## 5. Worker
 
@@ -172,8 +203,8 @@ Worker 以 POST 呼叫官方網頁使用的 `marksixDraw` operation，主要讀�
 `parseHKJCResponse`：
 
 1. 拒絕無效 JSON 或 GraphQL errors。
-2. 按日期排序候選攪珠。
-3. 選擇尚未有六個正選號碼且時間未過的最早一期。
+2. 驗證及正規化 GraphQL 回傳的所有可用攪珠，再按日期排序。
+3. 選擇尚未有六個正選號碼且時間未過的最早一期作 current draw；如晚間結果已公布但下一期尚未建立，current 可以暫時為空，已公布結果仍會保存。
 4. 把 `year` 及 `no` 格式化為例如 `26/080`。
 5. 接受官方金額的 number 或純數字 string，並轉為非負安全整數。
 6. 官方 `drawDate` 如只有日期，補成香港時間 21:30。
@@ -216,7 +247,7 @@ API 先讀 KV；cache miss 時讀取 D1 最新資料並回填 KV。
 
 Binding：`DB`
 
-`draws` 保存經驗證的攪珠 snapshot。相同 `id` 使用 upsert 更新，D1 成功後才更新 KV。
+`draws` 保存每次 GraphQL 回傳的所有經驗證攪珠。相同 `id` 使用 upsert 更新，因此同一期可由未攪珠狀態更新成完整結果。整批 D1 statement 成功後，只有存在下一期 current draw 時才更新 KV；晚間沒有下一期資料亦不會阻止已公布結果寫入 D1。
 
 `notification_subscriptions` 以 `installation_id` 為 primary key，保存：
 
@@ -235,10 +266,14 @@ Binding：`DB`
 Cron：
 
 ```text
-15 1 * * 0,2,4,6
+15 1 * * SUN,TUE,THU,SAT
+45 13 * * SUN,TUE,THU,SAT
+15 14 * * SUN,TUE,THU,SAT
 ```
 
-Cloudflare Cron 使用 UTC，因此以上等同香港時間逢星期日、星期二、星期四及星期六 09:15。Worker 只會在這四個可能的攪珠星期執行；執行後仍會比較官方 `drawDate` 與香港當日日期，因此沒有攪珠的星期六或星期日不會發送通知。
+Cloudflare Cron 使用 UTC。以上分別等同香港時間逢星期日、星期二、星期四及星期六 09:15、21:45 及 22:15。09:15 排程更新資料及判斷 APNs 通知；21:45 排程更新攪珠結果；22:15 是官方結果延遲時的後備重試。兩個晚間排程只更新 D1/KV，不會發送頭獎基金通知。
+
+Worker 只會在這四個可能的攪珠星期執行；通知服務仍會比較官方 `drawDate` 與香港當日日期，因此沒有攪珠的星期六或星期日不會發送通知。
 
 通知必須同時符合：
 
@@ -303,7 +338,15 @@ GET /v1/draws/current
 
 範例只說明 schema，並非保證目前一期的即時資料。尚未有任何 cache 或 D1 record 時回應 `503 DRAW_NOT_READY`。
 
-### 8.3 通知訂閱
+### 8.3 指定攪珠結果
+
+```http
+GET /v1/draws/{drawID}
+```
+
+`drawID` 是 current draw response 內的官方 `id`，只接受 1 至 80 字元的英文字母、數字、底線或連字號。找到記錄時回傳相同 `DrawInfo` schema；未找到時回傳 `404 DRAW_NOT_FOUND`。未攪珠記錄的 `mainNumbers` 為空陣列及 `specialNumber` 為 `null`。
+
+### 8.4 通知訂閱
 
 ```http
 POST /v1/notification-subscriptions
@@ -315,7 +358,7 @@ Request：
 ```json
 {
   "installationId": "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx",
-  "deviceToken": "64-character-hexadecimal-device-token",
+  "deviceToken": "hexadecimal-device-token",
   "threshold": 20000000,
   "enabled": true,
   "apnsEnvironment": "sandbox"
@@ -326,7 +369,7 @@ Request：
 
 - body 最多 8 KiB
 - installation ID 必須為 UUID
-- device token 必須為 64 個 hexadecimal 字元
+- device token 必須為 64 至 512 個 hexadecimal 字元、長度為雙數（完整 bytes）；這同時支援實體裝置及 Simulator token
 - threshold 必須為 0 至 1,000,000,000 的整數
 - APNs environment 只接受 `sandbox` 或 `production`
 
@@ -440,8 +483,8 @@ npx wrangler tail --env staging
 
 依序檢查：
 
-1. 使用實體裝置，並已允許通知。
-2. App 已取得 64 字元 device token。
+1. 使用實體裝置或支援 remote notifications 的 Simulator，並已允許通知。
+2. App 已取得有效的 hexadecimal device token；實體裝置通常是 64 字元，Simulator 可能較長。
 3. D1 訂閱的 `enabled`、`threshold` 及 `apns_environment` 正確。
 4. Debug 對 sandbox，Release 對 production。
 5. `APNS_TOPIC` 與 App Bundle Identifier 完全相同。
@@ -458,13 +501,10 @@ npx wrangler tail --env staging
 
 以下功能尚未在目前 repository 實作：
 
-1. SwiftData 投注紀錄 model、增刪及列表。
-2. 「我的投注」分為尚未攪珠、已攪珠及中獎結果。
-3. Worker 保存及提供已公布攪珠結果歷史。
-4. App 以正選號碼及特別號碼核對投注，映射對應獎項。
-5. 產生 1 至 49 中七個不重複、排序後的隨機號碼。
-6. 隨機號碼重新產生、複製、儲存及加入投注紀錄。
-7. production Worker、production KV/D1、Release API URL 及 App Store 上架設定。
+1. 已儲存號碼的刪除、分組及完整「我的投注」管理頁面。
+2. 按官方規則把正選及特別號碼命中組合映射成獎項名稱。
+3. 隨機號碼複製功能。
+4. production Worker、production KV/D1、Release API URL 及 App Store 上架設定。
 
 新增以上功能時應維持目前原則：功能按 feature 分檔、ViewModel 只管理畫面狀態、網絡及 persistence 保持獨立、避免 God Object，也不引入不必要的第三方 library。
 

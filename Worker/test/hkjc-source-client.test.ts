@@ -31,7 +31,7 @@ describe("HKJCSourceClient", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const client = new HKJCSourceClient("https://info.cld.hkjc.com/graphql/base/");
-    const draw = await client.fetchCurrent(NOW);
+    const snapshot = await client.fetchSnapshot(NOW);
 
     const request = fetchMock.mock.calls[0];
     const requestBody = JSON.parse(String(request?.[1]?.body)) as {
@@ -43,11 +43,12 @@ describe("HKJCSourceClient", () => {
     expect(requestBody.variables).toEqual({});
     expect(requestBody.query).toContain("fragment lotteryDrawsFragment");
     expect(requestBody.query).toContain("timeOffset");
-    expect(draw).toMatchObject({
+    expect(snapshot.current).toMatchObject({
       id: "202680N",
       drawNumber: "26/080",
       estimatedFirstPrizeFund: 13_000_000,
       specialNumber: null,
     });
+    expect(snapshot.draws).toHaveLength(1);
   });
 });

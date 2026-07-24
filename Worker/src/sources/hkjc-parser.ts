@@ -1,4 +1,4 @@
-import type { DrawInfo } from "../models/draw";
+import type { DrawInfo, DrawSnapshot } from "../models/draw";
 
 const OFFICIAL_MARK_SIX_URL = "https://bet.hkjc.com/ch/marksix";
 
@@ -39,8 +39,8 @@ export class HKJCParseError extends Error {
   }
 }
 
-/** Parses an official HKJC GraphQL response into the app's stable draw schema. */
-export function parseHKJCResponse(payload: string, now = new Date()): DrawInfo {
+/** Parses an official HKJC GraphQL response into a validated multi-draw snapshot. */
+export function parseHKJCResponse(payload: string, now = new Date()): DrawSnapshot {
   const response = decodePayload(payload);
   const upstreamError = response.errors?.map((error) => error.message).filter(Boolean).join(", ");
 
@@ -53,8 +53,17 @@ export function parseHKJCResponse(payload: string, now = new Date()): DrawInfo {
     throw new HKJCParseError("HKJC response did not include lotteryDraws");
   }
 
-  const candidate = selectNextDraw(draws, now);
-  return normalizeDraw(candidate, now);
+  const availableDraws = draws
+    .filter(hasRequiredFields)
+    .map((draw) => normalizeDraw(draw, now))
+    .sort((left, right) => Date.parse(left.drawDate) - Date.parse(right.drawDate));
+
+  if (availableDraws.length === 0) {
+    throw new HKJCParseError("HKJC response did not include any valid draws");
+  }
+
+  const current = selectNextDraw(availableDraws, now);
+  return { current, draws: availableDraws };
 }
 
 /** Decodes JSON while converting implementation-specific syntax errors. */
@@ -66,24 +75,12 @@ function decodePayload(payload: string): HKJCResponse {
   }
 }
 
-/** Selects the earliest undrawn draw that has not already passed. */
-function selectNextDraw(draws: HKJCDraw[], now: Date): HKJCDraw {
-  const validDraws = draws
-    .filter(hasRequiredFields)
-    .map((draw) => ({ draw, date: parseDrawDate(draw.drawDate as string) }))
-    .filter((candidate): candidate is { draw: HKJCDraw; date: Date } => candidate.date !== null)
-    .sort((left, right) => left.date.valueOf() - right.date.valueOf());
-
-  const upcoming = validDraws.find(({ draw, date }) => {
-    const hasResult = (draw.drawResult?.drawnNo?.length ?? 0) > 0;
-    return !hasResult && date.valueOf() >= now.valueOf();
-  });
-
-  if (!upcoming) {
-    throw new HKJCParseError("HKJC response did not include an upcoming draw");
-  }
-
-  return upcoming.draw;
+/** Selects the earliest normalized undrawn draw that has not already passed, if available. */
+function selectNextDraw(draws: DrawInfo[], now: Date): DrawInfo | null {
+  return draws.find((draw) => {
+    const timestamp = Date.parse(draw.drawDate);
+    return draw.mainNumbers.length === 0 && timestamp >= now.valueOf();
+  }) ?? null;
 }
 
 /** Checks the minimum fields required to produce a stable public response. */
@@ -161,15 +158,6 @@ function normalizeDrawDate(value: string): string {
     throw new HKJCParseError("HKJC response included an invalid drawDate");
   }
   return normalizedValue;
-}
-
-/** Parses a draw timestamp for chronological selection without leaking parser errors. */
-function parseDrawDate(value: string): Date | null {
-  try {
-    return new Date(normalizeDrawDate(value));
-  } catch {
-    return null;
-  }
 }
 
 /** Validates any published result numbers without requiring results for future draws. */

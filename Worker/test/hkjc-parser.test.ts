@@ -35,9 +35,9 @@ function makeFixture(): string {
 
 describe("parseHKJCResponse", () => {
   it("selects and normalizes the next undrawn draw", () => {
-    const draw = parseHKJCResponse(makeFixture(), NOW);
+    const snapshot = parseHKJCResponse(makeFixture(), NOW);
 
-    expect(draw).toMatchObject({
+    expect(snapshot.current).toMatchObject({
       id: "202676N",
       drawNumber: "26/076",
       drawDate: "2026-07-16T21:30:00+08:00",
@@ -46,6 +46,12 @@ describe("parseHKJCResponse", () => {
       jackpot: 18_000_000,
       mainNumbers: [],
       specialNumber: null,
+    });
+    expect(snapshot.draws).toHaveLength(2);
+    expect(snapshot.draws[0]).toMatchObject({
+      id: "202675N",
+      mainNumbers: [3, 8, 17, 24, 36, 45],
+      specialNumber: 9,
     });
   });
 
@@ -59,6 +65,19 @@ describe("parseHKJCResponse", () => {
     const payload = JSON.stringify({ data: { lotteryDraws: [] } });
 
     expect(() => parseHKJCResponse(payload, NOW)).toThrow("did not include lotteryDraws");
+  });
+
+  it("keeps published results when the next draw is not available yet", () => {
+    const fixture = JSON.parse(makeFixture()) as {
+      data: { lotteryDraws: unknown[] };
+    };
+    fixture.data.lotteryDraws = fixture.data.lotteryDraws.slice(0, 1);
+
+    const snapshot = parseHKJCResponse(JSON.stringify(fixture), NOW);
+
+    expect(snapshot.current).toBeNull();
+    expect(snapshot.draws).toHaveLength(1);
+    expect(snapshot.draws[0]?.mainNumbers).toEqual([3, 8, 17, 24, 36, 45]);
   });
 
   it("rejects non-numeric monetary strings", () => {

@@ -1,4 +1,4 @@
-import type { DrawInfo, DrawSource } from "../models/draw";
+import type { DrawSnapshot, DrawSource } from "../models/draw";
 import { HKJCParseError, parseHKJCResponse } from "./hkjc-parser";
 
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -51,7 +51,7 @@ export class HKJCSourceClient implements DrawSource {
   constructor(private readonly endpoint: string) {}
 
   /** Downloads a bounded GraphQL response and converts it into a stable model. */
-  async fetchCurrent(now = new Date()): Promise<DrawInfo> {
+  async fetchSnapshot(now = new Date()): Promise<DrawSnapshot> {
     const response = await fetch(this.endpoint, {
       method: "POST",
       headers: {

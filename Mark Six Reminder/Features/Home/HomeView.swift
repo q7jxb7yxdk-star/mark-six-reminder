@@ -1,8 +1,11 @@
 import SwiftUI
+import SwiftData
 
 /// Displays the latest validated draw information and its freshness.
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(SettingsViewModel.self) private var settingsModel
+    @Query(sort: \SavedNumberEntry.createdAt, order: .reverse) private var savedEntries: [SavedNumberEntry]
     @State private var model: HomeViewModel
 
     /// Creates a homepage with an injectable model for previews and tests.
@@ -22,19 +25,33 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("Jackpot Alert")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("重新整理", systemImage: "arrow.clockwise") {
-                        Task {
-                            await model.refresh()
-                        }
-                    }
-                    .disabled(model.isLoading)
-                }
-            }
         }
         .task {
-            await model.loadIfNeeded()
+            await model.loadIfNeeded(drawIDs: savedDrawIDs)
+        }
+        .task(id: automaticRefreshTaskID) {
+            guard scenePhase == .active else {
+                return
+            }
+
+            await model.runForegroundResultRefreshes(
+                drawIDs: savedDrawIDs,
+                drawDates: pendingResultDrawDates
+            )
+        }
+        .onChange(of: savedDrawIDs) { _, newDrawIDs in
+            Task {
+                await model.loadResults(for: newDrawIDs)
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else {
+                return
+            }
+
+            Task {
+                await model.refresh(drawIDs: savedDrawIDs)
+            }
         }
     }
 
@@ -62,6 +79,11 @@ struct HomeView: View {
                 .padding(.horizontal)
                 .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18))
 
+                SavedNumbersSection(
+                    entries: savedEntries,
+                    drawsByID: model.drawsByID
+                )
+
                 Label("非香港賽馬會官方應用程式，資料只供參考。", systemImage: "info.circle")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -70,8 +92,33 @@ struct HomeView: View {
             .padding()
         }
         .refreshable {
-            await model.refresh()
+            await model.refresh(drawIDs: savedDrawIDs)
         }
+    }
+
+    /// Returns unique saved draw identifiers for result refresh requests.
+    private var savedDrawIDs: [String] {
+        Array(Set(savedEntries.map(\.drawID))).sorted()
+    }
+
+    /// Returns draw dates which still need a complete official result.
+    private var pendingResultDrawDates: [String] {
+        Array(
+            Set(
+                savedEntries
+                    .filter { entry in
+                        model.drawResult(for: entry.drawID)?.hasPublishedResult != true
+                    }
+                    .map(\.drawDate)
+            )
+        )
+        .sorted()
+    }
+
+    /// Restarts or cancels the foreground schedule when app state or pending draws change.
+    private var automaticRefreshTaskID: String {
+        let appState = scenePhase == .active ? "active" : "inactive"
+        return "\(appState)|\(savedDrawIDs.joined(separator: ","))|\(pendingResultDrawDates.joined(separator: ","))"
     }
 
     /// Builds the primary estimated-prize card.
@@ -106,7 +153,7 @@ struct HomeView: View {
         } actions: {
             Button("再試一次") {
                 Task {
-                    await model.refresh()
+                    await model.refresh(drawIDs: savedDrawIDs)
                 }
             }
         }
@@ -143,7 +190,7 @@ private enum DrawAmountFormatter {
 }
 
 /// Formats ISO 8601 timestamps for the user's current locale and time zone.
-private enum DrawDateFormatter {
+enum DrawDateFormatter {
     private static let iso8601Formatter = ISO8601DateFormatter()
 
     private static let fractionalISO8601Formatter: ISO8601DateFormatter = {

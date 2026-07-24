@@ -8,20 +8,25 @@ Mark Six Reminder 是一個非官方的香港六合彩資訊 iOS App，顯示下
 
 已完成：
 
-- iOS 首頁顯示期數、攪珠日期、截止售票時間、估計頭獎基金、累積多寶及更新時間
+- iOS 首頁顯示期數、攪珠日期、估計頭獎基金、累積多寶及更新時間
 - 通知權限、HK$8,000,000／HK$13,000,000 預設門檻、自訂門檻，以及啟用或停用通知
 - APNs 裝置註冊及前景通知顯示
+- 獨立「運財號碼」頁面，隨機產生六個 1 至 49、不重複並由小至大排列的號碼，使用紅、藍、綠標準球色
+- 獨立「自選號碼」頁面，可選擇單式、複式或膽拖，並顯示所代表的六個號碼組合數目
+- 使用 SwiftData 把運財或自選號碼綁定下一期攪珠，號碼只保存在用戶裝置
+- 首頁按攪珠期數把多組已儲存號碼分組，官方結果只顯示一次，組內每項選擇逐一標示玩法、命中號碼、正選命中數目及特別號碼狀態
+- App 首次進入首頁及每次由背景返回前景時自動更新；如首頁持續留在前景，已儲存期數會在攪珠日 21:46 自動更新，未有結果時於 22:16 後備重試；首頁亦支援下拉重新整理
 - Cloudflare Worker 透過香港賽馬會網頁所使用的 GraphQL 端點取得及驗證資料
-- Cron 逢星期日、二、四、六香港時間 09:15 更新資料及判斷通知條件
+- Cron 逢星期日、二、四、六香港時間 09:15 更新資料及判斷通知條件，21:45 更新結果，22:15 後備重試
 - 每個裝置每期最多通知一次
 - D1 持久化攪珠、訂閱及發送紀錄，KV 快取目前攪珠資料
 - Worker 單元測試、結構化 logging 及基本錯誤處理
 
 尚待開發：
 
-- 使用 SwiftData 管理多組投注號碼
-- 攪珠結果自動核對及獎項顯示
-- 產生、複製、儲存及加入投注紀錄的隨機號碼
+- 已儲存號碼的刪除及完整管理頁面
+- 按官方獎項規則顯示獎項名稱
+- 隨機號碼複製功能
 - 「我的投注」頁面
 
 ## 技術架構
@@ -73,7 +78,8 @@ Worker 與本機 OpenCode 的六合彩 Telegram tracker 是兩套獨立流程。
 3. 確認 Bundle Identifier 與 Worker 的 `APNS_TOPIC` 相同。
 4. Debug build 使用 APNs sandbox；Release build 使用 APNs production。
 5. Debug 的 `JACKPOT_API_BASE_URL` 目前指向 staging Worker；Release 必須在上架前填入 production HTTPS URL。
-6. 使用實體 iPhone 測試 APNs，並允許通知權限。
+6. 使用實體 iPhone 完成上架前 APNs 測試；開發期間亦可用支援 remote notifications 的 Simulator 驗證註冊流程。
+7. 設定頁會在等待 APNs token 時顯示註冊狀態；若系統註冊失敗，會直接顯示錯誤而不會靜默等待。
 
 目前設定：
 
@@ -101,7 +107,9 @@ Staging environment 使用：
 - Worker：`mark-six-reminder-api-staging`
 - KV binding：`DRAW_CACHE`
 - D1 binding：`DB`
-- Cron：`15 1 * * 0,2,4,6`（UTC，即香港時間逢星期日、二、四、六 09:15）
+- 通知 Cron：`15 1 * * SUN,TUE,THU,SAT`（UTC，即香港時間 09:15）
+- 結果 Cron：`45 13 * * SUN,TUE,THU,SAT`（UTC，即香港時間 21:45）
+- 後備結果 Cron：`15 14 * * SUN,TUE,THU,SAT`（UTC，即香港時間 22:15）
 
 必須設定以下 secrets：
 
@@ -130,6 +138,7 @@ npm run check
 ```text
 GET  /health
 GET  /v1/draws/current
+GET  /v1/draws/{drawID}
 POST /v1/notification-subscriptions
 ```
 

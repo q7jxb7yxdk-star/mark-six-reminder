@@ -21,7 +21,11 @@
     }
   ],
   "triggers": {
-    "crons": ["15 1 * * 0,2,4,6"]
+    "crons": [
+      "15 1 * * SUN,TUE,THU,SAT",
+      "45 13 * * SUN,TUE,THU,SAT",
+      "15 14 * * SUN,TUE,THU,SAT"
+    ]
   },
   "observability": {
     "enabled": true,
@@ -49,7 +53,11 @@
         }
       ],
       "triggers": {
-        "crons": ["15 1 * * 0,2,4,6"]
+        "crons": [
+          "15 1 * * SUN,TUE,THU,SAT",
+          "45 13 * * SUN,TUE,THU,SAT",
+          "15 14 * * SUN,TUE,THU,SAT"
+        ]
       }
     }
   }
