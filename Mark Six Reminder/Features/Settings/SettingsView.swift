@@ -48,8 +48,6 @@ struct SettingsView: View {
             )
             .disabled(model.isSynchronizing)
 
-            LabeledContent("系統權限", value: authorizationDescription)
-
             if model.authorizationStatus == .notDetermined {
                 Button("設定通知權限") {
                     Task {
@@ -87,24 +85,6 @@ struct SettingsView: View {
             Text("通知門檻")
         } footer: {
             Text("只有當日有攪珠，而且估計頭獎基金達到或超過此金額，才會通知。每期最多一次。")
-        }
-    }
-
-    /// Provides a concise localized summary of the current system permission.
-    private var authorizationDescription: String {
-        switch model.authorizationStatus {
-        case .notDetermined:
-            "尚未詢問"
-        case .denied:
-            "已拒絕"
-        case .authorized:
-            "已允許"
-        case .provisional:
-            "暫時允許"
-        case .ephemeral:
-            "暫時允許"
-        @unknown default:
-            "未知"
         }
     }
 

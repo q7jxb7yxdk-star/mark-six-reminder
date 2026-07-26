@@ -9,29 +9,29 @@ Mark Six Reminder 是一個非官方的香港六合彩資訊 iOS App，顯示下
 已完成：
 
 - iOS 首頁顯示期數、攪珠日期、估計頭獎基金、累積多寶及更新時間
-- 通知權限、HK$8,000,000／HK$13,000,000 預設門檻、自訂門檻，以及啟用或停用通知
+- 通知權限、$8,000,000／$13,000,000／$18,000,000 固定門檻，以及啟用或停用通知
 - APNs 裝置註冊及前景通知顯示
 - 獨立「運財號碼」頁面，隨機產生六個 1 至 49、不重複並由小至大排列的號碼，使用紅、藍、綠標準球色
 - 獨立「自選號碼」頁面，可選擇單式、複式或膽拖，並顯示所代表的六個號碼組合數目
 - 使用 SwiftData 把運財或自選號碼綁定下一期攪珠，號碼只保存在用戶裝置
-- 首頁按攪珠期數把多組已儲存號碼分組，官方結果只顯示一次，組內每項選擇逐一標示玩法、命中號碼、正選命中數目及特別號碼狀態
+- 首頁按攪珠期數把多組已儲存號碼分組，官方結果只顯示一次，組內每項選擇逐一標示玩法、命中號碼及頭獎至七獎資格；記錄可向左滑動刪除
 - App 首次進入首頁及每次由背景返回前景時自動更新；如首頁持續留在前景，已儲存期數會在攪珠日 21:46 自動更新，未有結果時於 22:16 後備重試；首頁亦支援下拉重新整理
 - Cloudflare Worker 透過香港賽馬會網頁所使用的 GraphQL 端點取得及驗證資料
 - Cron 逢星期日、二、四、六香港時間 09:15 更新資料及判斷通知條件，21:45 更新結果，22:15 後備重試
 - 每個裝置每期最多通知一次
 - D1 持久化攪珠、訂閱及發送紀錄，KV 快取目前攪珠資料
 - Worker 單元測試、結構化 logging 及基本錯誤處理
+- 1024×1024、無 Alpha Channel 的自訂 App Icon；App Store Primary Category 使用 Reference
 
 尚待開發：
 
-- 已儲存號碼的刪除及完整管理頁面
-- 按官方獎項規則顯示獎項名稱
 - 隨機號碼複製功能
 - 「我的投注」頁面
+- production Worker、production 儲存資源及 Release API URL
 
 ## 技術架構
 
-- iOS 18+
+- iOS 26+
 - Swift 6、SwiftUI、Observation、Async/Await、UserNotifications
 - Cloudflare Workers、KV、D1、Cron Triggers
 - TypeScript、Vitest
@@ -85,7 +85,7 @@ Worker 與本機 OpenCode 的六合彩 Telegram tracker 是兩套獨立流程。
 
 - Bundle Identifier：`Sunny.Mark-Six-Reminder`
 - Staging API：`https://mark-six-reminder-api-staging.nutrition-api.workers.dev`
-- 最低支援版本：iOS 18.0
+- 最低支援版本：iOS 26.0
 
 ## Worker 本機開發
 

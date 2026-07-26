@@ -156,7 +156,7 @@ final class SettingsViewModel {
 
         do {
             try await apiClient.register(registration)
-            statusMessage = notificationsEnabled ? "通知設定已更新。" : "通知已關閉。"
+            statusMessage = notificationsEnabled ? nil : "通知已關閉。"
         } catch {
             statusMessage = error.localizedDescription
         }

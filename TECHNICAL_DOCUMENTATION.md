@@ -44,7 +44,7 @@ Mark Six Reminder 是非官方六合彩資訊工具，只提供資料顯示及�
 │ - Home                     │
 │ - SwiftData saved numbers  │
 │ - Settings                 │
-│ - APNs registration       │
+│ - APNs registration        │
 └────────────────────────────┘
 ```
 
@@ -63,7 +63,7 @@ Mark Six Reminder 是非官方六合彩資訊工具，只提供資料顯示及�
 
 ### 4.1 平台及語言
 
-- iOS 18.0+
+- iOS 26.0+
 - Swift 6
 - SwiftUI
 - Observation (`@Observable`)
@@ -81,7 +81,12 @@ Mark Six Reminder/
 ├── Features/
 │   ├── Home/
 │   │   ├── HomeView.swift
-│   │   └── HomeViewModel.swift
+│   │   ├── HomeViewModel.swift
+│   │   ├── SavedNumbersSection.swift
+│   │   └── MarkSixPrizeEvaluator.swift
+│   ├── CustomNumbers/
+│   │   ├── CustomNumbersView.swift
+│   │   └── CustomNumbersViewModel.swift
 │   ├── RandomNumbers/
 │   │   ├── RandomNumbersView.swift
 │   │   └── RandomNumbersViewModel.swift
@@ -111,7 +116,6 @@ Mark Six Reminder/
 - 期數
 - 攪珠日期
 - 最近更新時間
-- 用戶目前通知門檻
 - 已儲存號碼及相應期數的官方核對結果
 
 首次進入首頁時自動載入；App 每次由背景返回前景時亦會自動更新目前攪珠及所有已儲存期數的結果。若 App 一直停留在前景，首頁會只針對尚未有完整結果的已儲存攪珠日期建立等待 Task，在香港時間 21:46 自動更新，仍未有結果時於 22:16 後備重試。Task 不會輪詢，進入背景或結果已完整時會自動取消。首頁不設獨立 toolbar 按鈕，但保留 pull-to-refresh 作手動後備。未設定 API URL、沒有資料或 request 失敗時，頁面顯示可重試錯誤狀態，不使用假資料。
@@ -126,7 +130,7 @@ Mark Six Reminder/
 | `notification.enabled` | 是否啟用通知 | `true` |
 | `notification.installationId` | 每次 App 安裝的穩定 UUID | 首次啟動產生 |
 
-預設選項為 HK$8,000,000 及 HK$13,000,000，新安裝預設使用 HK$13,000,000，亦接受 0 至 1,000,000,000 的整數自訂值。已安裝用戶如已有儲存門檻，更新 App 後會保留原值。
+App 提供 $8,000,000、$13,000,000 及 $18,000,000 三個固定選項，新安裝預設使用 $13,000,000。設定頁不提供自訂輸入或獨立的「目前門檻」列；勾號直接標示目前選項。已安裝用戶如已有舊自訂門檻，更新後會保留原值，直至用戶選擇新的固定門檻。
 
 ### 4.6 APNs 註冊
 
@@ -139,7 +143,7 @@ Mark Six Reminder/
 5. `SettingsViewModel` 把 installation ID、token、門檻、enabled 及 APNs environment 傳送到 Worker。
 
 Debug build 註冊為 `sandbox`，Release build 註冊為 `production`。Worker 會依每筆訂閱選擇相應 APNs gateway。
-設定頁在等待 token 時顯示「正在註冊通知裝置」，`AppDelegate` 亦會把 APNs 註冊失敗傳回畫面，避免操作看似沒有反應。
+設定頁不持續顯示系統權限文字；尚未詢問時顯示「設定通知權限」，已拒絕時顯示「開啟 iPhone 設定」。等待 token 時顯示「正在註冊通知裝置」，`AppDelegate` 亦會把 APNs 註冊失敗傳回畫面。同步成功不額外顯示「通知設定已更新」，但處理中、關閉通知及錯誤提示會保留。
 
 ### 4.7 運財號碼
 
@@ -149,7 +153,7 @@ Debug build 註冊為 `sandbox`，Release build 註冊為 `production`。Worker 
 
 用戶按「儲存號碼」時，App 先讀取目前下一期攪珠，把官方 `drawID`、期數、日期及六個號碼寫入本機 `SavedNumberEntry`。同一期可保存多組號碼，但完全相同的一組不會重複建立。現有六個整數欄位繼續保留，確保舊 SwiftData 記錄可向後兼容；新記錄另以簡單逗號分隔文字保存原始選號及玩法。這些號碼不會上傳到 Worker。
 
-首頁以 SwiftData `@Query` 顯示已儲存號碼，並呼叫 `GET /v1/draws/{drawID}` 讀取該期官方結果。`SavedNumbersSection` 按 `drawID` 把多組號碼分組，每一期只顯示一次六個官方正選號碼及特別號碼，再按儲存先後把選擇標示為「第 1 組」、「第 2 組」等並逐一核對。每組命中的球以黃色邊框標示，並獨立顯示正選命中數目及是否中特別號碼。未公布結果時顯示「等待官方攪珠結果」。
+首頁以 SwiftData `@Query` 顯示已儲存號碼，並呼叫 `GET /v1/draws/{drawID}` 讀取該期官方結果。`SavedNumbersSection` 按 `drawID` 把多組號碼分組，每一期只顯示一次六個官方正選號碼及特別號碼，再按儲存先後把選擇標示為「第 1 組」、「第 2 組」等並逐一核對。每組命中的球以黃色邊框標示，結果列顯示獎項資格或「未獲獎」；用戶可向左滑動刪除個別記錄。未公布結果時顯示「等待官方攪珠結果」。
 
 `MarkSixNumberBall` 是可重用的 SwiftUI 元件，按六合彩標準號碼分組顯示紅、藍或綠球。元件以 SwiftUI 漸層、白色中央區域及黑色數字自行繪製，不包含或下載香港賽馬會的 SVG、Logo 或其他圖片資產，並為 VoiceOver 提供球色及號碼標籤。
 
@@ -163,7 +167,9 @@ Debug build 註冊為 `sandbox`，Release build 註冊為 `production`。Worker 
 
 規則依照香港賽馬會六合彩注項說明。App 只保存原始選號，不會為複式或膽拖建立大量六號碼 SwiftData 記錄；組合數使用 `n choose k` 計算。`SavedNumberEntry` 的 `selectionTypeRawValue`、`selectedNumbersStorage` 及 `bankerNumbersStorage` 保存玩法資料，舊記錄在沒有新欄位內容時自動視為單式。
 
-首頁會在同一期內逐項顯示單式、複式或膽拖。膽拖分開顯示膽及拖；官方結果公布後，所有命中球均以黃色邊框標示，並分別摘要膽與拖命中的正選數目及是否中特別號碼。App 不提交投注，也不計算或顯示投注金額。
+首頁會在同一期內逐項顯示單式、複式或膽拖。膽拖分開顯示膽及拖；官方結果公布後，所有命中球均以黃色邊框標示。`MarkSixPrizeEvaluator` 依每注六個號碼判定：6 個正選為頭獎、5 個正選加特別號碼為二獎、5 個正選為三獎、4 個正選加特別號碼為四獎、4 個正選為五獎、3 個正選加特別號碼為六獎、3 個正選為七獎。
+
+複式及膽拖不會逐注建立陣列；核對器按正選、特別號碼及其他號碼的組合數直接彙總各獎項注數，例如「二獎資格 × 2、七獎資格 × 5」。這避免大量選號時展開所有組合。App 只表示獎項資格，不提交投注，也不計算或顯示投注金額或實際派彩。
 
 ## 5. Worker
 
@@ -289,7 +295,7 @@ Worker 只會在這四個可能的攪珠星期執行；通知服務仍會比較�
 通知 payload 包含：
 
 - 標題：`今晚六合彩攪珠`
-- 內容：期數及估計頭獎基金
+- 內容：期數及估計頭獎基金，金額以 `$` 加千位分隔顯示
 - 預設提示聲
 - 自訂 `drawId`
 - `apns-collapse-id` 使用 draw ID
@@ -501,18 +507,19 @@ npx wrangler tail --env staging
 
 以下功能尚未在目前 repository 實作：
 
-1. 已儲存號碼的刪除、分組及完整「我的投注」管理頁面。
-2. 按官方規則把正選及特別號碼命中組合映射成獎項名稱。
-3. 隨機號碼複製功能。
-4. production Worker、production KV/D1、Release API URL 及 App Store 上架設定。
+1. 完整「我的投注」管理頁面。
+2. 隨機號碼複製功能。
+3. production Worker、production KV/D1、Release API URL 及 App Store 上架設定。
 
 新增以上功能時應維持目前原則：功能按 feature 分檔、ViewModel 只管理畫面狀態、網絡及 persistence 保持獨立、避免 God Object，也不引入不必要的第三方 library。
 
 ## 13. App Store 注意事項
 
 - App 名稱及 metadata 應持續清楚標示為非官方工具。
+- App Store Primary Category 使用 `Reference`；如設定 Secondary Category，可使用 `Utilities`。
 - App 內保留「不提供投注／款項／博彩建議」聲明。
 - 不使用香港賽馬會商標暗示官方認可。
+- App Icon 使用自製圖像，標準版本為 1024×1024 PNG、無 Alpha Channel，並由系統套用圓角遮罩。
 - 提供可公開存取的 Privacy Policy 及 Support URL。
 - Privacy nutrition label 必須與實際收集資料一致；目前 backend 保存 installation ID、APNs device token、門檻及通知狀態。
 - 上架前使用 production APNs entitlement、production Worker URL 及 production 資源完成實機測試。

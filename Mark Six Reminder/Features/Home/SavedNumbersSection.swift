@@ -93,8 +93,18 @@ struct SavedNumbersSection: View {
 
             savedNumberRows(entry, highlightedNumbers: matchedNumbers)
 
-            if let result, result.hasPublishedResult {
-                Text(matchSummary(entry: entry, result: result))
+            if let result,
+               result.hasPublishedResult,
+               let specialNumber = result.specialNumber {
+                Text(
+                    MarkSixPrizeEvaluator.evaluate(
+                        selectionType: entry.selectionType,
+                        selectedNumbers: entry.numbers,
+                        bankerNumbers: entry.bankerNumbers,
+                        mainNumbers: result.mainNumbers,
+                        specialNumber: specialNumber
+                    ).summary
+                )
                     .font(.subheadline.weight(.semibold))
             }
         }
@@ -191,25 +201,6 @@ struct SavedNumbersSection: View {
                 }
             }
         )
-    }
-
-    /// Summarizes main-number and special-number matches for one saved set.
-    private func matchSummary(entry: SavedNumberEntry, result: DrawInfo) -> String {
-        let selectedNumbers = Set(entry.numbers)
-        let mainNumbers = Set(result.mainNumbers)
-        let mainMatchCount = selectedNumbers.intersection(mainNumbers).count
-        let matchedSpecial = result.specialNumber.map(selectedNumbers.contains) ?? false
-        let specialText = matchedSpecial ? "中特別號碼" : "未中特別號碼"
-
-        if entry.selectionType == .banker {
-            let bankerMatchCount = Set(entry.bankerNumbers).intersection(mainNumbers).count
-            let legMatchCount = Set(entry.legNumbers).intersection(mainNumbers).count
-            return "膽中 \(bankerMatchCount) 個正選、拖中 \(legMatchCount) 個正選，\(specialText)"
-        }
-        if entry.selectionType == .multiple {
-            return "所選號碼中了 \(mainMatchCount) 個正選號碼，\(specialText)"
-        }
-        return "中了 \(mainMatchCount) 個正選號碼，\(specialText)"
     }
 
     /// Groups entries by draw and orders groups newest-first and selections oldest-first.
