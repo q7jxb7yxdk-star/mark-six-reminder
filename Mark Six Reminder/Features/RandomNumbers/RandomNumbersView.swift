@@ -19,23 +19,27 @@ struct RandomNumbersView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
-                    VStack(spacing: 8) {
-                        Text("隨機產生六個號碼")
-                            .font(.title2.bold())
+                VStack(spacing: 20) {
+                    VStack(spacing: 18) {
+                        VStack(spacing: 7) {
+                            Label("六個運財號碼", systemImage: "sparkles")
+                                .font(.title2.bold())
+                                .foregroundStyle(.red)
 
-                        Text("號碼範圍為 1 至 49，不會重複，並按小至大排列。")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
+                            Text("從 1 至 49 隨機產生，不會重複，並按小至大排列。")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
 
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(Array(displayedNumbers.enumerated()), id: \.offset) { _, number in
-                            MarkSixNumberBall(number: number)
-                                .frame(maxWidth: .infinity)
+                        LazyVGrid(columns: columns, spacing: 16) {
+                            ForEach(Array(displayedNumbers.enumerated()), id: \.offset) { _, number in
+                                MarkSixNumberBall(number: number)
+                                    .frame(maxWidth: .infinity)
+                            }
                         }
                     }
+                    .appCard(cornerRadius: 24)
 
                     VStack(spacing: 12) {
                         HStack(spacing: 12) {
@@ -62,28 +66,29 @@ struct RandomNumbersView: View {
                         }
 
                         if model.isSaving {
-                            ProgressView("正在綁定下一期攪珠…")
-                                .font(.footnote)
+                            AppStatusMessage(
+                                message: "正在綁定下一期攪珠…",
+                                kind: .progress
+                            )
                         } else if let successMessage = model.successMessage {
-                            Label(successMessage, systemImage: "checkmark.circle.fill")
-                                .font(.footnote)
-                                .foregroundStyle(.green)
+                            AppStatusMessage(message: successMessage, kind: .success)
                         } else if let errorMessage = model.errorMessage {
-                            Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                                .font(.footnote)
-                                .foregroundStyle(.red)
+                            AppStatusMessage(message: errorMessage, kind: .error)
                         }
                     }
 
-                    Divider()
-
-                    Text("隨機號碼只供娛樂，不構成博彩建議。")
+                    Label(
+                        "隨機號碼只供娛樂，不構成博彩建議。",
+                        systemImage: "info.circle"
+                    )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
+            .background(Color.primary.opacity(0.025))
             .navigationTitle("運財號碼")
             .navigationBarTitleDisplayMode(.inline)
         }

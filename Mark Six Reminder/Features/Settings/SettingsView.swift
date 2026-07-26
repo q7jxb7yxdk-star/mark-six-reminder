@@ -13,13 +13,19 @@ struct SettingsView: View {
 
                 if let statusMessage = model.statusMessage {
                     Section {
-                        Label(statusMessage, systemImage: statusIcon)
-                            .foregroundStyle(.secondary)
+                        AppStatusMessage(
+                            message: statusMessage,
+                            kind: model.isBusy ? .progress : .info
+                        )
                     }
+                    .listRowBackground(Color.clear)
                 }
 
                 Section {
-                    Text("本 App 不提供投注、不收取款項，通知只根據你設定的估計頭獎基金門檻。")
+                    Label(
+                        "本 App 不提供投注、不收取款項，通知只根據你設定的估計頭獎基金門檻。",
+                        systemImage: "info.circle"
+                    )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -34,9 +40,8 @@ struct SettingsView: View {
 
     /// Displays notification authorization and the user's enabled preference.
     private var notificationSection: some View {
-        Section("頭獎基金通知") {
+        Section {
             Toggle(
-                "啟用通知",
                 isOn: Binding(
                     get: { model.notificationsEnabled },
                     set: { enabled in
@@ -45,7 +50,10 @@ struct SettingsView: View {
                         }
                     }
                 )
-            )
+            ) {
+                Label("啟用通知", systemImage: "bell.badge.fill")
+                    .foregroundStyle(.primary)
+            }
             .disabled(model.isSynchronizing)
 
             if model.authorizationStatus == .notDetermined {
@@ -60,6 +68,8 @@ struct SettingsView: View {
                     model.openSystemSettings()
                 }
             }
+        } header: {
+            Text("頭獎基金通知")
         }
     }
 
@@ -74,23 +84,30 @@ struct SettingsView: View {
                 } label: {
                     HStack {
                         Text(currency(amount))
+                            .font(.body.weight(.medium))
+                            .foregroundStyle(.primary)
                         Spacer()
-                        if model.threshold == amount {
-                            Image(systemName: "checkmark")
-                        }
+                        Image(
+                            systemName: model.threshold == amount
+                                ? "checkmark.circle.fill"
+                                : "circle"
+                        )
+                        .font(.title3)
+                        .foregroundStyle(
+                            model.threshold == amount
+                                ? Color.red
+                                : Color.secondary.opacity(0.45)
+                        )
                     }
+                    .contentShape(Rectangle())
                 }
+                .disabled(model.isSynchronizing)
             }
         } header: {
             Text("通知門檻")
         } footer: {
             Text("只有當日有攪珠，而且估計頭獎基金達到或超過此金額，才會通知。每期最多一次。")
         }
-    }
-
-    /// Chooses a neutral status symbol while a backend update is running.
-    private var statusIcon: String {
-        model.isBusy ? "arrow.trianglehead.2.clockwise" : "info.circle"
     }
 
     /// Formats preset amounts consistently with the rest of the app.

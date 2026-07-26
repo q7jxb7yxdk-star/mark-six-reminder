@@ -64,20 +64,25 @@ struct HomeView: View {
                 .listRowSeparator(.hidden)
 
             VStack(spacing: 0) {
-                DetailRow(title: "攪珠期數", value: draw.drawNumber)
+                DetailRow(
+                    title: "攪珠期數",
+                    value: draw.drawNumber,
+                    systemImage: "number.circle.fill"
+                )
                 Divider()
                 DetailRow(
                     title: "攪珠日期",
-                    value: DrawDateFormatter.hongKongDrawDate(draw.drawDate)
+                    value: DrawDateFormatter.hongKongDrawDate(draw.drawDate),
+                    systemImage: "calendar"
                 )
                 Divider()
                 DetailRow(
                     title: "最近更新",
-                    value: DrawDateFormatter.hongKongTimestamp(draw.updatedAt)
+                    value: DrawDateFormatter.hongKongTimestamp(draw.updatedAt),
+                    systemImage: "clock.arrow.circlepath"
                 )
             }
-            .padding(.horizontal)
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18))
+            .appCard()
             .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
@@ -94,8 +99,10 @@ struct HomeView: View {
                 .listRowSeparator(.hidden)
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(12)
         .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
+        .background(Color.primary.opacity(0.025))
         .refreshable {
             await model.refresh(drawIDs: savedDrawIDs)
         }
@@ -131,22 +138,45 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("估計頭獎基金", systemImage: "bell.badge.fill")
                 .font(.headline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.86))
 
             Text(DrawAmountFormatter.currency(draw.estimatedFirstPrizeFund))
                 .font(.system(size: 38, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
 
             if let jackpot = draw.jackpot, jackpot > 0 {
-                Text("累積多寶：\(DrawAmountFormatter.currency(jackpot))")
+                Label(
+                    "累積多寶：\(DrawAmountFormatter.currency(jackpot))",
+                    systemImage: "sparkles"
+                )
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.white.opacity(0.16), in: Capsule())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(22)
-        .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 22))
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.72, green: 0.04, blue: 0.08),
+                    Color(red: 0.94, green: 0.22, blue: 0.16),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 24)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(.white.opacity(0.16), lineWidth: 1)
+        }
+        .shadow(color: .red.opacity(0.18), radius: 16, y: 8)
     }
 
     /// Displays configuration, network or backend errors without fake data.
@@ -169,9 +199,13 @@ struct HomeView: View {
 private struct DetailRow: View {
     let title: String
     let value: String
+    let systemImage: String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Image(systemName: systemImage)
+                .foregroundStyle(.red)
+                .frame(width: 22)
             Text(title)
                 .foregroundStyle(.secondary)
             Spacer()

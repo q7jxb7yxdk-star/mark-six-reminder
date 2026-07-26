@@ -43,12 +43,16 @@ struct MarkSixNumberBall: View {
         }
         .frame(width: size, height: size)
         .overlay {
-            if isHighlighted {
-                Circle()
-                    .stroke(.yellow, lineWidth: max(3, size * 0.08))
-            }
+            Circle()
+                .stroke(
+                    isHighlighted ? Color.yellow : Color.white.opacity(0.45),
+                    lineWidth: isHighlighted ? max(3, size * 0.08) : 1
+                )
         }
-        .shadow(color: .black.opacity(0.28), radius: size * 0.06, y: size * 0.02)
+        .scaleEffect(isHighlighted ? 1.04 : 1)
+        .shadow(color: .black.opacity(0.16), radius: size * 0.08, y: size * 0.04)
+        .contentShape(Circle())
+        .animation(.snappy(duration: 0.18), value: isHighlighted)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
     }

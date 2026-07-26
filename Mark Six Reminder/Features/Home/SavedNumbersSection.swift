@@ -15,6 +15,9 @@ struct SavedNumbersSection: View {
                 Label("尚未儲存號碼", systemImage: "tray")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .appCard()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             } else {
                 ForEach(drawGroups) { group in
                     drawGroupSection(group)
@@ -35,8 +38,9 @@ struct SavedNumbersSection: View {
         return Section {
             VStack(alignment: .leading, spacing: 12) {
                 if let result, result.hasPublishedResult, let specialNumber = result.specialNumber {
-                    Text("官方攪珠結果")
+                    Label("官方攪珠結果", systemImage: "checkmark.seal.fill")
                         .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.red)
 
                     officialResultRow(result.mainNumbers, specialNumber: specialNumber)
                 } else {
@@ -45,7 +49,11 @@ struct SavedNumbersSection: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.vertical, 4)
+            .padding(16)
+            .background(.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 18))
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 6, trailing: 16))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
 
             ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                 savedSelection(
@@ -53,7 +61,10 @@ struct SavedNumbersSection: View {
                     position: index + 1,
                     result: result
                 )
-                .padding(.vertical, 4)
+                .appCard(cornerRadius: 18)
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button("刪除", systemImage: "trash", role: .destructive) {
                         delete(entry)
@@ -61,11 +72,17 @@ struct SavedNumbersSection: View {
                 }
             }
         } header: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("第\(group.drawNumber)期")
-                    .font(.headline)
-                Text(DrawDateFormatter.hongKongDrawDate(group.drawDate))
-                    .font(.caption)
+            HStack(spacing: 10) {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundStyle(.red)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("第\(group.drawNumber)期")
+                        .font(.headline)
+                    Text(DrawDateFormatter.hongKongDrawDate(group.drawDate))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .textCase(nil)
         }
@@ -96,18 +113,33 @@ struct SavedNumbersSection: View {
             if let result,
                result.hasPublishedResult,
                let specialNumber = result.specialNumber {
-                Text(
+                prizeStatus(
                     MarkSixPrizeEvaluator.evaluate(
                         selectionType: entry.selectionType,
                         selectedNumbers: entry.numbers,
                         bankerNumbers: entry.bankerNumbers,
                         mainNumbers: result.mainNumbers,
                         specialNumber: specialNumber
-                    ).summary
+                    )
                 )
-                    .font(.subheadline.weight(.semibold))
             }
         }
+    }
+
+    /// Displays a visually distinct winning or non-winning qualification result.
+    private func prizeStatus(_ evaluation: MarkSixPrizeEvaluation) -> some View {
+        let hasPrize = !evaluation.prizeCounts.isEmpty
+        let color: Color = hasPrize ? .orange : .gray
+
+        return Label(
+            evaluation.summary,
+            systemImage: hasPrize ? "trophy.fill" : "minus.circle.fill"
+        )
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(color)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .background(color.opacity(0.11), in: Capsule())
     }
 
     /// Shows saved balls, splitting banker and leg values when necessary.

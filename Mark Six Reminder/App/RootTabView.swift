@@ -24,5 +24,6 @@ struct RootTabView: View {
                     Label("設定", systemImage: "gearshape")
                 }
         }
+        .tint(.red)
     }
 }

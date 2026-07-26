@@ -21,23 +21,27 @@ struct CustomNumbersView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     typePicker
-                    guidanceCard
 
                     if model.selectionType == .banker {
                         bankerRolePicker
                     }
 
-                    numberGrid
+                    numberSelectionCard
                     selectionSummary
                     actionButtons
 
-                    Text("自選號碼只供記錄及結果核對，本 App 不提供投注或博彩建議。")
+                    Label(
+                        "自選號碼只供記錄及結果核對，本 App 不提供投注或博彩建議。",
+                        systemImage: "info.circle"
+                    )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
+            .background(Color.primary.opacity(0.025))
             .navigationTitle("自選號碼")
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -60,16 +64,6 @@ struct CustomNumbersView: View {
         .disabled(model.isSaving)
     }
 
-    /// Displays the current official structural requirement and selected count.
-    private var guidanceCard: some View {
-        Text(model.guidance)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
-    }
-
     /// Selects whether subsequent banker-mode taps represent bankers or legs.
     private var bankerRolePicker: some View {
         Picker(
@@ -84,7 +78,29 @@ struct CustomNumbersView: View {
             }
         }
         .pickerStyle(.segmented)
+        .padding(4)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .disabled(model.isSaving)
+    }
+
+    /// Groups the 49-number control in one clearly labelled selection surface.
+    private var numberSelectionCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("選擇號碼", systemImage: "circle.grid.3x3.fill")
+                    .font(.headline)
+                    .foregroundStyle(.red)
+
+                Spacer()
+
+                Text("已選 \(model.selectedNumbers.count) 個")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            numberGrid
+        }
+        .appCard(cornerRadius: 22)
     }
 
     /// Renders all 49 official-color number balls as accessible buttons.
@@ -121,11 +137,30 @@ struct CustomNumbersView: View {
     @ViewBuilder
     private var selectionSummary: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Label {
+                Text(model.guidance)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } icon: {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundStyle(.orange)
+            }
+
+            Divider()
+
+            Label("選號摘要", systemImage: "list.bullet.clipboard.fill")
+                .font(.headline)
+                .foregroundStyle(.red)
+
             if model.selectionType == .banker, !model.selectedNumbers.isEmpty {
                 selectedLine(title: "膽", numbers: model.sortedBankerNumbers)
                 selectedLine(title: "拖", numbers: model.sortedLegNumbers)
             } else if !model.selectedNumbers.isEmpty {
                 selectedLine(title: "已選", numbers: model.sortedNumbers)
+            } else {
+                Text("尚未選擇號碼")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
 
             if model.canSave {
@@ -135,9 +170,13 @@ struct CustomNumbersView: View {
                 )
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.green)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.green.opacity(0.10), in: Capsule())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard(cornerRadius: 18)
     }
 
     /// Displays one sorted list without adding another row of large balls.
@@ -154,11 +193,13 @@ struct CustomNumbersView: View {
     /// Provides clear, separate reset and persistence actions.
     private var actionButtons: some View {
         VStack(spacing: 12) {
-            HStack {
+            HStack(spacing: 12) {
                 Button("清除全部", systemImage: "trash") {
                     model.clearSelection()
                 }
+                .frame(maxWidth: .infinity)
                 .buttonStyle(.bordered)
+                .controlSize(.large)
                 .disabled(model.selectedNumbers.isEmpty || model.isSaving)
 
                 Button("儲存號碼", systemImage: "square.and.arrow.down") {
@@ -166,21 +207,21 @@ struct CustomNumbersView: View {
                         await model.saveSelection(in: modelContext)
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .disabled(!model.canSave)
             }
 
             if model.isSaving {
-                ProgressView("正在綁定下一期攪珠…")
-                    .font(.footnote)
+                AppStatusMessage(
+                    message: "正在綁定下一期攪珠…",
+                    kind: .progress
+                )
             } else if let successMessage = model.successMessage {
-                Label(successMessage, systemImage: "checkmark.circle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.green)
+                AppStatusMessage(message: successMessage, kind: .success)
             } else if let errorMessage = model.errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                AppStatusMessage(message: errorMessage, kind: .error)
             }
         }
     }
