@@ -1,55 +1,51 @@
+import SwiftData
 import SwiftUI
 
 /// Groups locally saved selections by draw and compares every set with one official result.
 struct SavedNumbersSection: View {
+    @Environment(\.modelContext) private var modelContext
+    @State private var deletionErrorMessage: String?
+
     let entries: [SavedNumberEntry]
     let drawsByID: [String: DrawInfo]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("我的號碼")
-                .font(.title3.bold())
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+        Group {
             if drawGroups.isEmpty {
                 Label("尚未儲存號碼", systemImage: "tray")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18))
             } else {
                 ForEach(drawGroups) { group in
-                    drawGroupCard(group)
+                    drawGroupSection(group)
                 }
             }
         }
+        .alert("未能刪除號碼", isPresented: deletionErrorIsPresented) {
+            Button("確定", role: .cancel) {}
+        } message: {
+            Text(deletionErrorMessage ?? "請稍後再試。")
+        }
     }
 
-    /// Builds one card containing a shared official result and every saved set for that draw.
-    private func drawGroupCard(_ group: SavedDrawGroup) -> some View {
+    /// Builds one native list section containing a shared result and swipeable selections.
+    private func drawGroupSection(_ group: SavedDrawGroup) -> some View {
         let result = drawsByID[group.id]
 
-        return VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("第\(group.drawNumber)期")
-                    .font(.headline)
-                Text(DrawDateFormatter.hongKongDrawDate(group.drawDate))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        return Section {
+            VStack(alignment: .leading, spacing: 12) {
+                if let result, result.hasPublishedResult, let specialNumber = result.specialNumber {
+                    Text("官方攪珠結果")
+                        .font(.subheadline.weight(.semibold))
+
+                    officialResultRow(result.mainNumbers, specialNumber: specialNumber)
+                } else {
+                    Label("等待官方攪珠結果", systemImage: "clock")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
-
-            if let result, result.hasPublishedResult, let specialNumber = result.specialNumber {
-                Text("官方攪珠結果")
-                    .font(.subheadline.weight(.semibold))
-
-                officialResultRow(result.mainNumbers, specialNumber: specialNumber)
-            } else {
-                Label("等待官方攪珠結果", systemImage: "clock")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Divider()
+            .padding(.vertical, 4)
 
             ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                 savedSelection(
@@ -57,15 +53,22 @@ struct SavedNumbersSection: View {
                     position: index + 1,
                     result: result
                 )
-
-                if index < group.entries.count - 1 {
-                    Divider()
+                .padding(.vertical, 4)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button("刪除", systemImage: "trash", role: .destructive) {
+                        delete(entry)
+                    }
                 }
             }
+        } header: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("第\(group.drawNumber)期")
+                    .font(.headline)
+                Text(DrawDateFormatter.hongKongDrawDate(group.drawDate))
+                    .font(.caption)
+            }
+            .textCase(nil)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18))
     }
 
     /// Shows one numbered selection and its independent result summary.
@@ -112,9 +115,28 @@ struct SavedNumbersSection: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             numberGrid(entry.legNumbers, highlightedNumbers: highlightedNumbers)
+        } else if entry.numbers.count == 6 {
+            centeredNumberRow(entry.numbers, highlightedNumbers: highlightedNumbers)
         } else {
             numberGrid(entry.numbers, highlightedNumbers: highlightedNumbers)
         }
+    }
+
+    /// Shows one complete six-number selection centered within its list row.
+    private func centeredNumberRow(
+        _ numbers: [Int],
+        highlightedNumbers: Set<Int>
+    ) -> some View {
+        HStack(spacing: 6) {
+            ForEach(numbers, id: \.self) { number in
+                MarkSixNumberBall(
+                    number: number,
+                    size: 42,
+                    isHighlighted: highlightedNumbers.contains(number)
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     /// Shows a wrapping grid of saved balls with all matching numbers highlighted.
@@ -131,21 +153,44 @@ struct SavedNumbersSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Shows six official main numbers followed by the special number.
+    /// Shows six official main numbers, a plus sign and the equally sized special number.
     private func officialResultRow(_ mainNumbers: [Int], specialNumber: Int) -> some View {
-        HStack(alignment: .bottom, spacing: 5) {
+        HStack(spacing: 3) {
             ForEach(mainNumbers, id: \.self) { number in
-                MarkSixNumberBall(number: number, size: 34)
+                MarkSixNumberBall(number: number, size: 42)
             }
 
-            VStack(spacing: 2) {
-                Text("特")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                MarkSixNumberBall(number: specialNumber, size: 34)
-            }
+            Text("+")
+                .font(.headline.bold())
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("加")
+
+            MarkSixNumberBall(number: specialNumber, size: 42)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    /// Deletes one local selection and rolls back the context if persistence fails.
+    private func delete(_ entry: SavedNumberEntry) {
+        modelContext.delete(entry)
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            deletionErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Presents deletion errors while keeping optional alert state in one property.
+    private var deletionErrorIsPresented: Binding<Bool> {
+        Binding(
+            get: { deletionErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    deletionErrorMessage = nil
+                }
+            }
+        )
     }
 
     /// Summarizes main-number and special-number matches for one saved set.

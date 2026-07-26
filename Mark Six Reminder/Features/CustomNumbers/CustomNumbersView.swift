@@ -39,6 +39,7 @@ struct CustomNumbersView: View {
                 .padding()
             }
             .navigationTitle("自選號碼")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 

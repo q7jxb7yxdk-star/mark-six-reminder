@@ -24,7 +24,8 @@ struct HomeView: View {
                     unavailableContent
                 }
             }
-            .navigationTitle("Jackpot Alert")
+            .navigationTitle("六合彩提醒")
+            .navigationBarTitleDisplayMode(.inline)
         }
         .task {
             await model.loadIfNeeded(drawIDs: savedDrawIDs)
@@ -55,42 +56,48 @@ struct HomeView: View {
         }
     }
 
-    /// Builds the scrollable success state for one draw.
+    /// Builds the refreshable list state for one draw and its locally saved selections.
     private func drawContent(_ draw: DrawInfo) -> some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                jackpotCard(draw)
+        List {
+            jackpotCard(draw)
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
-                VStack(spacing: 0) {
-                    DetailRow(title: "攪珠期數", value: draw.drawNumber)
-                    Divider()
-                    DetailRow(
-                        title: "攪珠日期",
-                        value: DrawDateFormatter.hongKongDrawDate(draw.drawDate)
-                    )
-                    Divider()
-                    DetailRow(
-                        title: "最近更新",
-                        value: DrawDateFormatter.hongKongTimestamp(draw.updatedAt)
-                    )
-                    Divider()
-                    DetailRow(title: "通知門檻", value: settingsModel.formattedThreshold)
-                }
-                .padding(.horizontal)
-                .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18))
-
-                SavedNumbersSection(
-                    entries: savedEntries,
-                    drawsByID: model.drawsByID
+            VStack(spacing: 0) {
+                DetailRow(title: "攪珠期數", value: draw.drawNumber)
+                Divider()
+                DetailRow(
+                    title: "攪珠日期",
+                    value: DrawDateFormatter.hongKongDrawDate(draw.drawDate)
                 )
-
-                Label("非香港賽馬會官方應用程式，資料只供參考。", systemImage: "info.circle")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Divider()
+                DetailRow(
+                    title: "最近更新",
+                    value: DrawDateFormatter.hongKongTimestamp(draw.updatedAt)
+                )
+                Divider()
+                DetailRow(title: "通知門檻", value: settingsModel.formattedThreshold)
             }
-            .padding()
+            .padding(.horizontal)
+            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18))
+            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+
+            SavedNumbersSection(
+                entries: savedEntries,
+                drawsByID: model.drawsByID
+            )
+
+            Label("非香港賽馬會官方應用程式，資料只供參考。", systemImage: "info.circle")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
         .refreshable {
             await model.refresh(drawIDs: savedDrawIDs)
         }

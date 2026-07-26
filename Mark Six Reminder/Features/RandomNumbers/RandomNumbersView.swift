@@ -38,24 +38,28 @@ struct RandomNumbersView: View {
                     }
 
                     VStack(spacing: 12) {
-                        Button(
-                            model.hasGeneratedNumbers ? "重新產生" : "產生號碼",
-                            systemImage: model.hasGeneratedNumbers ? "arrow.clockwise" : "dice.fill"
-                        ) {
-                            model.generateNumbers()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .disabled(model.isSaving)
-
-                        Button("儲存號碼", systemImage: "square.and.arrow.down") {
-                            Task {
-                                await model.saveNumbers(in: modelContext)
+                        HStack(spacing: 12) {
+                            Button(
+                                model.hasGeneratedNumbers ? "重新產生" : "產生號碼",
+                                systemImage: model.hasGeneratedNumbers ? "arrow.clockwise" : "dice.fill"
+                            ) {
+                                model.generateNumbers()
                             }
+                            .frame(maxWidth: .infinity)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .disabled(model.isSaving)
+
+                            Button("儲存號碼", systemImage: "square.and.arrow.down") {
+                                Task {
+                                    await model.saveNumbers(in: modelContext)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .buttonStyle(.bordered)
+                            .controlSize(.large)
+                            .disabled(!model.canSaveNumbers)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
-                        .disabled(!model.canSaveNumbers)
 
                         if model.isSaving {
                             ProgressView("正在綁定下一期攪珠…")
@@ -81,6 +85,7 @@ struct RandomNumbersView: View {
                 .padding()
             }
             .navigationTitle("運財號碼")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 
