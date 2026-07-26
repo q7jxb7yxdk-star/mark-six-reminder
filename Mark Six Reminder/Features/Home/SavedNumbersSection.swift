@@ -49,7 +49,8 @@ struct SavedNumbersSection: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(16)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 8)
             .background(.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 18))
             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 6, trailing: 16))
             .listRowBackground(Color.clear)
@@ -197,7 +198,7 @@ struct SavedNumbersSection: View {
 
     /// Shows six official main numbers, a plus sign and the equally sized special number.
     private func officialResultRow(_ mainNumbers: [Int], specialNumber: Int) -> some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 2) {
             ForEach(mainNumbers, id: \.self) { number in
                 MarkSixNumberBall(number: number, size: 42)
             }
@@ -205,6 +206,9 @@ struct SavedNumbersSection: View {
             Text("+")
                 .font(.headline.bold())
                 .foregroundStyle(.secondary)
+                .frame(width: 12)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
                 .accessibilityLabel("加")
 
             MarkSixNumberBall(number: specialNumber, size: 42)
