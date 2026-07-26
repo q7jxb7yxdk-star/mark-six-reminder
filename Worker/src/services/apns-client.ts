@@ -94,11 +94,7 @@ export class APNsClient implements NotificationSender {
 
 /** Builds the small visible notification payload consumed by the iOS app. */
 function makePayload(notification: JackpotNotification): object {
-  const amount = new Intl.NumberFormat("zh-HK", {
-    style: "currency",
-    currency: "HKD",
-    maximumFractionDigits: 0,
-  }).format(notification.estimatedFund);
+  const amount = `$${new Intl.NumberFormat("en-US").format(notification.estimatedFund)}`;
 
   return {
     aps: {

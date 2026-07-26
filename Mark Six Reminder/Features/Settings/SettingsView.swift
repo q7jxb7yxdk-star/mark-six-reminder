@@ -4,7 +4,6 @@ import UserNotifications
 /// Allows the user to control notification permission and the jackpot threshold.
 struct SettingsView: View {
     @Environment(SettingsViewModel.self) private var model
-    @State private var customThreshold = ""
 
     var body: some View {
         NavigationStack {
@@ -66,11 +65,9 @@ struct SettingsView: View {
         }
     }
 
-    /// Displays preset values and accepts a custom whole-dollar threshold.
+    /// Displays the supported jackpot notification thresholds.
     private var thresholdSection: some View {
         Section {
-            LabeledContent("目前門檻", value: model.formattedThreshold)
-
             ForEach(SettingsViewModel.presetThresholds, id: \.self) { amount in
                 Button {
                     Task {
@@ -86,20 +83,6 @@ struct SettingsView: View {
                     }
                 }
             }
-
-            TextField("自訂金額，例如 25000000", text: $customThreshold)
-                .keyboardType(.numberPad)
-
-            Button("套用自訂門檻") {
-                guard let amount = Int(customThreshold) else {
-                    return
-                }
-                Task {
-                    await model.updateThreshold(amount)
-                    customThreshold = ""
-                }
-            }
-            .disabled(Int(customThreshold) == nil)
         } header: {
             Text("通知門檻")
         } footer: {
@@ -132,6 +115,6 @@ struct SettingsView: View {
 
     /// Formats preset amounts consistently with the rest of the app.
     private func currency(_ amount: Int) -> String {
-        "HK$\(amount.formatted(.number.grouping(.automatic)))"
+        "$\(amount.formatted(.number.grouping(.automatic)))"
     }
 }

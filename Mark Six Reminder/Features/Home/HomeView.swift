@@ -4,7 +4,6 @@ import SwiftData
 /// Displays the latest validated draw information and its freshness.
 struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(SettingsViewModel.self) private var settingsModel
     @Query(sort: \SavedNumberEntry.createdAt, order: .reverse) private var savedEntries: [SavedNumberEntry]
     @State private var model: HomeViewModel
 
@@ -60,7 +59,7 @@ struct HomeView: View {
     private func drawContent(_ draw: DrawInfo) -> some View {
         List {
             jackpotCard(draw)
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 10, trailing: 16))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
@@ -76,8 +75,6 @@ struct HomeView: View {
                     title: "最近更新",
                     value: DrawDateFormatter.hongKongTimestamp(draw.updatedAt)
                 )
-                Divider()
-                DetailRow(title: "通知門檻", value: settingsModel.formattedThreshold)
             }
             .padding(.horizontal)
             .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18))
@@ -97,6 +94,7 @@ struct HomeView: View {
                 .listRowSeparator(.hidden)
         }
         .listStyle(.insetGrouped)
+        .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .refreshable {
             await model.refresh(drawIDs: savedDrawIDs)
@@ -186,13 +184,13 @@ private struct DetailRow: View {
 
 /// Formats monetary values consistently without assuming a non-null estimate.
 private enum DrawAmountFormatter {
-    /// Formats an optional whole-dollar amount in Hong Kong dollars.
+    /// Formats an optional whole-dollar amount using the app's concise dollar prefix.
     static func currency(_ amount: Int?) -> String {
         guard let amount else {
             return "尚未公布"
         }
 
-        return "HK$\(amount.formatted(.number.grouping(.automatic)))"
+        return "$\(amount.formatted(.number.grouping(.automatic)))"
     }
 }
 

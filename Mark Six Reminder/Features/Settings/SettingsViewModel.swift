@@ -6,7 +6,7 @@ import UserNotifications
 @MainActor
 @Observable
 final class SettingsViewModel {
-    static let presetThresholds = [8_000_000, 13_000_000]
+    static let presetThresholds = [8_000_000, 13_000_000, 18_000_000]
 
     private(set) var threshold: Int
     private(set) var notificationsEnabled: Bool
@@ -69,11 +69,6 @@ final class SettingsViewModel {
         isRegisteringDevice || isSynchronizing
     }
 
-    /// Formats the selected threshold in Hong Kong dollars.
-    var formattedThreshold: String {
-        "HK$\(threshold.formatted(.number.grouping(.automatic)))"
-    }
-
     /// Refreshes system permission and synchronizes a previously issued APNs token.
     func prepare() async {
         await notificationManager.refreshAuthorizationStatus()
@@ -98,7 +93,7 @@ final class SettingsViewModel {
 
     /// Persists and synchronizes the user's chosen alert threshold.
     func updateThreshold(_ newValue: Int) async {
-        guard (0...1_000_000_000).contains(newValue) else {
+        guard Self.presetThresholds.contains(newValue) else {
             statusMessage = "請輸入有效的通知門檻。"
             return
         }
