@@ -466,8 +466,8 @@ npx wrangler deploy --env staging
 部署後檢查：
 
 ```bash
-curl https://mark-six-reminder-api-staging.nutrition-api.workers.dev/health
-curl https://mark-six-reminder-api-staging.nutrition-api.workers.dev/v1/draws/current
+curl https://mark-six-reminder-api-staging.sonicman.workers.dev/health
+curl https://mark-six-reminder-api-staging.sonicman.workers.dev/v1/draws/current
 npx wrangler tail --env staging
 ```
 

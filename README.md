@@ -85,7 +85,7 @@ Worker 與本機 OpenCode 的六合彩 Telegram tracker 是兩套獨立流程。
 目前設定：
 
 - Bundle Identifier：`Sunny.Mark-Six-Reminder`
-- Staging API：`https://mark-six-reminder-api-staging.nutrition-api.workers.dev`
+- Staging API：`https://mark-six-reminder-api-staging.sonicman.workers.dev`
 - 最低支援版本：iOS 26.0
 
 ## Worker 本機開發

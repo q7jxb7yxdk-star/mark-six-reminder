@@ -272,7 +272,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				JACKPOT_API_BASE_URL = "https://mark-six-reminder-api-staging.nutrition-api.workers.dev";
+				JACKPOT_API_BASE_URL = "https://mark-six-reminder-api-staging.sonicman.workers.dev";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
