@@ -97,7 +97,7 @@ describe("notification subscription API", () => {
         body: JSON.stringify({
           installationId: "550e8400-e29b-41d4-a716-446655440000",
           deviceToken,
-          threshold: 13_000_000,
+          threshold: 25_000_000,
           enabled: true,
           apnsEnvironment: "sandbox",
         }),
@@ -109,7 +109,7 @@ describe("notification subscription API", () => {
     expect(response.status).toBe(200);
     expect(notificationStore.savedSubscription).toMatchObject({
       deviceToken: deviceToken.toLowerCase(),
-      threshold: 13_000_000,
+      threshold: 25_000_000,
       enabled: true,
       apnsEnvironment: "sandbox",
     });

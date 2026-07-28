@@ -6,7 +6,7 @@ import UserNotifications
 @MainActor
 @Observable
 final class SettingsViewModel {
-    static let presetThresholds = [8_000_000, 13_000_000, 18_000_000]
+    static let presetThresholds = [8_000_000, 13_000_000, 18_000_000, 25_000_000]
 
     private(set) var threshold: Int
     private(set) var notificationsEnabled: Bool
