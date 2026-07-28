@@ -4,8 +4,11 @@ import SwiftData
 /// Displays the latest validated draw information and its freshness.
 struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
+    @Environment(SettingsViewModel.self) private var settings
     @Query(sort: \SavedNumberEntry.createdAt, order: .reverse) private var savedEntries: [SavedNumberEntry]
     @State private var model: HomeViewModel
+    @State private var cleanupErrorMessage: String?
 
     /// Creates a homepage with an injectable model for previews and tests.
     init(model: HomeViewModel = HomeViewModel()) {
@@ -39,6 +42,9 @@ struct HomeView: View {
                 drawDates: pendingResultDrawDates
             )
         }
+        .task(id: oldNumberCleanupTaskID) {
+            deleteOldSavedNumbersIfNeeded()
+        }
         .onChange(of: savedDrawIDs) { _, newDrawIDs in
             Task {
                 await model.loadResults(for: newDrawIDs)
@@ -52,6 +58,11 @@ struct HomeView: View {
             Task {
                 await model.refresh(drawIDs: savedDrawIDs)
             }
+        }
+        .alert("未能刪除舊號碼", isPresented: cleanupErrorIsPresented) {
+            Button("確定", role: .cancel) {}
+        } message: {
+            Text(cleanupErrorMessage ?? "請稍後再試。")
         }
     }
 
@@ -131,6 +142,43 @@ struct HomeView: View {
     private var automaticRefreshTaskID: String {
         let appState = scenePhase == .active ? "active" : "inactive"
         return "\(appState)|\(savedDrawIDs.joined(separator: ","))|\(pendingResultDrawDates.joined(separator: ","))"
+    }
+
+    /// Restarts local cleanup when its setting, current draw or saved entries change.
+    private var oldNumberCleanupTaskID: String {
+        let setting = settings.deleteOldNumbersEnabled ? "on" : "off"
+        let currentDrawID = model.draw?.id ?? "none"
+        let entryIDs = savedEntries.map(\.id.uuidString).sorted().joined(separator: ",")
+        return "\(setting)|\(currentDrawID)|\(entryIDs)"
+    }
+
+    /// Removes selections older than the current draw only when the user enabled cleanup.
+    private func deleteOldSavedNumbersIfNeeded() {
+        guard settings.deleteOldNumbersEnabled, let draw = model.draw else {
+            return
+        }
+
+        do {
+            try SavedNumberCleanup.deleteEntries(
+                before: draw,
+                from: savedEntries,
+                in: modelContext
+            )
+        } catch {
+            cleanupErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Presents automatic cleanup errors using one optional state property.
+    private var cleanupErrorIsPresented: Binding<Bool> {
+        Binding(
+            get: { cleanupErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    cleanupErrorMessage = nil
+                }
+            }
+        )
     }
 
     /// Builds the primary estimated-prize card.

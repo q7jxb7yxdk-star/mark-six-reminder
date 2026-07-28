@@ -95,7 +95,8 @@ Mark Six Reminder/
 │       └── SettingsViewModel.swift
 ├── Models/
 │   ├── DrawInfo.swift
-│   └── SavedNumberEntry.swift
+│   ├── SavedNumberEntry.swift
+│   └── SavedNumberCleanup.swift
 ├── Networking/
 │   ├── JackpotAPIClient.swift
 │   └── NotificationAPIClient.swift
@@ -124,15 +125,18 @@ Mark Six Reminder/
 
 ### 4.5 設定及本機持久化
 
-通知設定暫時使用 `UserDefaults`：
+App 設定使用 `UserDefaults`：
 
 | Key | 用途 | 預設值 |
 |---|---|---:|
 | `notification.threshold` | 通知金額門檻 | 13,000,000 |
 | `notification.enabled` | 是否啟用通知 | `true` |
 | `notification.installationId` | 每次 App 安裝的穩定 UUID | 首次啟動產生 |
+| `savedNumbers.deleteOldNumbersEnabled` | 是否自動刪除舊期數號碼 | `false` |
 
 App 提供 $8,000,000、$13,000,000 及 $18,000,000 三個固定選項，新安裝預設使用 $13,000,000。設定頁不提供自訂輸入或獨立的「目前門檻」列；勾號直接標示目前選項。已安裝用戶如已有舊自訂門檻，更新後會保留原值，直至用戶選擇新的固定門檻。
+
+「刪除舊號碼」預設關閉。開啟後，首頁只有在成功取得目前攪珠資料時才呼叫 `SavedNumberCleanup`；helper 解析目前及已儲存記錄的 ISO 8601 攪珠日期，只刪除日期較早的 `SavedNumberEntry`，保留目前期數的全部組別。無目前資料或日期無法解析時不會刪除；SwiftData 儲存失敗時會 rollback 並在首頁顯示錯誤。此功能使用現有 `drawNumber` 及 `drawDate` 欄位，不需要 SwiftData schema migration。
 
 ### 4.6 APNs 註冊
 
@@ -155,7 +159,7 @@ Debug build 註冊為 `sandbox`，Release build 註冊為 `production`。Worker 
 
 用戶按「儲存號碼」時，App 先讀取目前下一期攪珠，把官方 `drawID`、期數、日期及六個號碼寫入本機 `SavedNumberEntry`。同一期可保存多組號碼，但完全相同的一組不會重複建立。現有六個整數欄位繼續保留，確保舊 SwiftData 記錄可向後兼容；新記錄另以簡單逗號分隔文字保存原始選號及玩法。這些號碼不會上傳到 Worker。
 
-首頁以 SwiftData `@Query` 顯示已儲存號碼，並呼叫 `GET /v1/draws/{drawID}` 讀取該期官方結果。`SavedNumbersSection` 按 `drawID` 把多組號碼分組，每一期只顯示一次六個官方正選號碼及特別號碼，再按儲存先後把選擇標示為「第 1 組」、「第 2 組」等並逐一核對。每組命中的球以完整金色外框標示，結果列顯示獎項資格或「未獲獎」；用戶可向左滑動刪除個別記錄。未公布結果時顯示「等待官方攪珠結果」。
+首頁以 SwiftData `@Query` 顯示已儲存號碼，並呼叫 `GET /v1/draws/{drawID}` 讀取該期官方結果。`SavedNumbersSection` 按 `drawID` 把多組號碼分組，每一期只顯示一次六個官方正選號碼及特別號碼，再按儲存先後以「26/070 期，第 1 組・單式」格式標示期數、組別及玩法並逐一核對。每組命中的球以完整金色外框標示，結果列顯示獎項資格或「未獲獎」；用戶可向左滑動刪除個別記錄。未公布結果時顯示「等待官方攪珠結果」。
 
 `MarkSixNumberBall` 是可重用的 SwiftUI 元件，按六合彩標準號碼分組顯示紅、藍或綠球。元件以 SwiftUI 漸層、白色中央區域及黑色數字自行繪製，不包含或下載香港賽馬會的 SVG、Logo 或其他圖片資產，並為 VoiceOver 提供球色及號碼標籤。
 
@@ -171,7 +175,7 @@ Debug build 註冊為 `sandbox`，Release build 註冊為 `production`。Worker 
 
 規則依照香港賽馬會六合彩注項說明。App 只保存原始選號，不會為複式或膽拖建立大量六號碼 SwiftData 記錄；組合數使用 `n choose k` 計算。`SavedNumberEntry` 的 `selectionTypeRawValue`、`selectedNumbersStorage` 及 `bankerNumbersStorage` 保存玩法資料，舊記錄在沒有新欄位內容時自動視為單式。
 
-首頁會在同一期內逐項顯示單式、複式或膽拖。膽拖分開顯示膽及拖；官方結果公布後，所有命中球均以黃色邊框標示。`MarkSixPrizeEvaluator` 依每注六個號碼判定：6 個正選為頭獎、5 個正選加特別號碼為二獎、5 個正選為三獎、4 個正選加特別號碼為四獎、4 個正選為五獎、3 個正選加特別號碼為六獎、3 個正選為七獎。
+首頁會在同一期內逐項顯示單式、複式或膽拖。膽拖分開顯示膽及拖；官方結果公布後，所有命中球均以完整金色外框標示。`MarkSixPrizeEvaluator` 依每注六個號碼判定：6 個正選為頭獎、5 個正選加特別號碼為二獎、5 個正選為三獎、4 個正選加特別號碼為四獎、4 個正選為五獎、3 個正選加特別號碼為六獎、3 個正選為七獎。
 
 複式及膽拖不會逐注建立陣列；核對器按正選、特別號碼及其他號碼的組合數直接彙總各獎項注數，例如「二獎資格 × 2、七獎資格 × 5」。這避免大量選號時展開所有組合。App 只表示獎項資格，不提交投注，也不計算或顯示投注金額或實際派彩。
 

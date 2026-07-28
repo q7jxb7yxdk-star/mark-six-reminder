@@ -100,7 +100,7 @@ struct SavedNumbersSection: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("第 \(position) 組・\(entry.selectionType.displayName)")
+                Text("\(entry.drawNumber) 期，第 \(position) 組・\(entry.selectionType.displayName)")
                 Spacer()
                 if entry.combinationCount > 1 {
                     Text("\(entry.combinationCount.formatted()) 注")

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import UserNotifications
 
-/// Owns persisted jackpot notification preferences and backend synchronization state.
+/// Owns persisted app preferences and notification synchronization state.
 @MainActor
 @Observable
 final class SettingsViewModel {
@@ -10,6 +10,7 @@ final class SettingsViewModel {
 
     private(set) var threshold: Int
     private(set) var notificationsEnabled: Bool
+    private(set) var deleteOldNumbersEnabled: Bool
     private(set) var isSynchronizing = false
     private(set) var isRegisteringDevice = false
     private(set) var statusMessage: String?
@@ -35,6 +36,9 @@ final class SettingsViewModel {
 
         threshold = defaults.object(forKey: PreferenceKey.threshold) as? Int ?? 13_000_000
         notificationsEnabled = defaults.object(forKey: PreferenceKey.enabled) as? Bool ?? true
+        deleteOldNumbersEnabled = defaults.object(
+            forKey: PreferenceKey.deleteOldNumbersEnabled
+        ) as? Bool ?? false
 
         if let storedId = defaults.string(forKey: PreferenceKey.installationId),
            UUID(uuidString: storedId) != nil {
@@ -122,6 +126,12 @@ final class SettingsViewModel {
         await synchronizeIfPossible()
     }
 
+    /// Persists whether saved selections older than the current draw are removed automatically.
+    func setDeleteOldNumbersEnabled(_ enabled: Bool) {
+        deleteOldNumbersEnabled = enabled
+        defaults.set(enabled, forKey: PreferenceKey.deleteOldNumbersEnabled)
+    }
+
     /// Sends current settings only when both the Worker URL and APNs token exist.
     func synchronizeIfPossible() async {
         guard !isSynchronizing else {
@@ -182,9 +192,10 @@ final class SettingsViewModel {
     }
 }
 
-/// UserDefaults keys owned by notification settings.
+/// UserDefaults keys owned by app settings.
 private enum PreferenceKey {
     static let threshold = "notification.threshold"
     static let enabled = "notification.enabled"
     static let installationId = "notification.installationId"
+    static let deleteOldNumbersEnabled = "savedNumbers.deleteOldNumbersEnabled"
 }

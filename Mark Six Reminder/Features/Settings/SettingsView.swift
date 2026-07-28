@@ -10,6 +10,7 @@ struct SettingsView: View {
             Form {
                 notificationSection
                 thresholdSection
+                savedNumbersSection
 
                 if let statusMessage = model.statusMessage {
                     Section {
@@ -107,6 +108,25 @@ struct SettingsView: View {
             Text("通知門檻")
         } footer: {
             Text("只有當日有攪珠，而且估計頭獎基金達到或超過此金額，才會通知。每期最多一次。")
+        }
+    }
+
+    /// Controls whether selections from draws earlier than the current draw are retained.
+    private var savedNumbersSection: some View {
+        Section {
+            Toggle(
+                isOn: Binding(
+                    get: { model.deleteOldNumbersEnabled },
+                    set: { model.setDeleteOldNumbersEnabled($0) }
+                )
+            ) {
+                Label("刪除舊號碼", systemImage: "trash")
+                    .foregroundStyle(.primary)
+            }
+        } header: {
+            Text("號碼記錄")
+        } footer: {
+            Text("開啟後，App 取得新的攪珠期數時會永久刪除較早期數的已儲存號碼，只保留目前期數。預設關閉。")
         }
     }
 
