@@ -80,14 +80,45 @@ describe("parseHKJCResponse", () => {
     expect(snapshot.draws[0]?.mainNumbers).toEqual([3, 8, 17, 24, 36, 45]);
   });
 
-  it("rejects non-numeric monetary strings", () => {
+  it("accepts currency symbols and grouped monetary strings", () => {
     const fixture = JSON.parse(makeFixture()) as {
-      data: { lotteryDraws: Array<{ lotteryPool: { derivedFirstPrizeDiv: string } }> };
+      data: {
+        lotteryDraws: Array<{
+          lotteryPool: { jackpot: string; derivedFirstPrizeDiv: string };
+        }>;
+      };
     };
+    fixture.data.lotteryDraws[1]!.lotteryPool.jackpot = "HK$ 18,000,000";
     fixture.data.lotteryDraws[1]!.lotteryPool.derivedFirstPrizeDiv = "$30,000,000";
 
-    expect(() => parseHKJCResponse(JSON.stringify(fixture), NOW)).toThrow(
-      "invalid monetary value",
-    );
+    const snapshot = parseHKJCResponse(JSON.stringify(fixture), NOW);
+
+    expect(snapshot.current?.jackpot).toBe(18_000_000);
+    expect(snapshot.current?.estimatedFirstPrizeFund).toBe(30_000_000);
+  });
+
+  it("ignores unavailable or malformed optional money without discarding results", () => {
+    const fixture = JSON.parse(makeFixture()) as {
+      data: {
+        lotteryDraws: Array<{
+          lotteryPool: { jackpot: number | string; derivedFirstPrizeDiv: string };
+        }>;
+      };
+    };
+    fixture.data.lotteryDraws[0]!.lotteryPool.jackpot = "-";
+    fixture.data.lotteryDraws[1]!.lotteryPool.jackpot = -1;
+    fixture.data.lotteryDraws[1]!.lotteryPool.derivedFirstPrizeDiv = "not available";
+
+    const snapshot = parseHKJCResponse(JSON.stringify(fixture), NOW);
+
+    expect(snapshot.draws[0]).toMatchObject({
+      jackpot: null,
+      mainNumbers: [3, 8, 17, 24, 36, 45],
+      specialNumber: 9,
+    });
+    expect(snapshot.current).toMatchObject({
+      jackpot: null,
+      estimatedFirstPrizeFund: null,
+    });
   });
 });

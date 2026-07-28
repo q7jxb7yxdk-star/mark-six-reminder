@@ -104,8 +104,10 @@ function normalizeDraw(draw: HKJCDraw, now: Date): DrawInfo {
     drawNumber: `${year.slice(-2)}/${drawSequence}`,
     drawDate: normalizeDrawDate(draw.drawDate as string),
     salesCloseAt: draw.closeDate as string,
-    estimatedFirstPrizeFund: toNonNegativeInteger(draw.lotteryPool?.derivedFirstPrizeDiv),
-    jackpot: toNonNegativeInteger(draw.lotteryPool?.jackpot),
+    estimatedFirstPrizeFund: parseOptionalNonNegativeInteger(
+      draw.lotteryPool?.derivedFirstPrizeDiv,
+    ),
+    jackpot: parseOptionalNonNegativeInteger(draw.lotteryPool?.jackpot),
     status: draw.status ?? "Unknown",
     mainNumbers,
     specialNumber,
@@ -114,29 +116,28 @@ function normalizeDraw(draw: HKJCDraw, now: Date): DrawInfo {
   };
 }
 
-/** Normalizes optional monetary values while rejecting negative or invalid data. */
-function toNonNegativeInteger(value: number | string | null | undefined): number | null {
+/** Parses optional whole-dollar values without allowing invalid money to discard draw results. */
+function parseOptionalNonNegativeInteger(
+  value: number | string | null | undefined,
+): number | null {
   if (value == null) {
     return null;
   }
 
-  const normalizedValue = typeof value === "string"
-    ? parseIntegerString(value)
-    : value;
-  if (!Number.isSafeInteger(normalizedValue) || normalizedValue < 0) {
-    throw new HKJCParseError("HKJC response included an invalid monetary value");
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
   }
 
-  return normalizedValue;
-}
-
-/** Parses the digits-only monetary strings returned by marksixDraw. */
-function parseIntegerString(value: string): number {
   const trimmedValue = value.trim();
-  if (!/^\d+$/.test(trimmedValue)) {
-    return Number.NaN;
+  const amountWithoutCurrency = trimmedValue.replace(/^(?:HK)?\$\s*/i, "");
+  const isPlainInteger = /^\d+$/.test(amountWithoutCurrency);
+  const isGroupedInteger = /^\d{1,3}(?:,\d{3})+$/.test(amountWithoutCurrency);
+  if (!isPlainInteger && !isGroupedInteger) {
+    return null;
   }
-  return Number(trimmedValue);
+
+  const amount = Number(amountWithoutCurrency.replaceAll(",", ""));
+  return Number.isSafeInteger(amount) && amount >= 0 ? amount : null;
 }
 
 /** Converts an official draw date into the app's ISO timestamp representation. */

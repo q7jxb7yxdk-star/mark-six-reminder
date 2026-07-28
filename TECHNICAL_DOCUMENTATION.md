@@ -220,7 +220,7 @@ Worker 以 POST 呼叫官方網頁使用的 `marksixDraw` operation，主要讀�
 2. 驗證及正規化 GraphQL 回傳的所有可用攪珠，再按日期排序。
 3. 選擇尚未有六個正選號碼且時間未過的最早一期作 current draw；如晚間結果已公布但下一期尚未建立，current 可以暫時為空，已公布結果仍會保存。
 4. 把 `year` 及 `no` 格式化為例如 `26/080`。
-5. 接受官方金額的 number 或純數字 string，並轉為非負安全整數。
+5. 接受官方金額的 number 或整數 string；string 可包含 `$`、`HK$`、前後空白及正確的千位逗號，並正規化為非負安全整數。負數、小數、placeholder 或其他無效的可選金額會轉為 `null`，不會阻止有效攋珠號碼寫入 D1。
 6. 官方 `drawDate` 如只有日期，補成香港時間 21:30。
 7. 只有完整六個正選號碼時才接受特別號碼，避免把未攪珠 placeholder 當成結果。
 8. 已公布號碼必須為 1 至 49、共七個且不重複。
@@ -509,7 +509,7 @@ npx wrangler tail --env staging
 
 ### 11.4 Worker 沒有更新資料
 
-檢查 Cron、Worker logs、GraphQL HTTP status、response 大小及 schema。Parser 會刻意拒絕欄位不足、金額無效、日期無效或號碼不完整的資料，避免錯誤內容污染 D1/KV。
+檢查 Cron、Worker logs、GraphQL HTTP status、response 大小及 schema。Parser 會拒絕無效 JSON、GraphQL errors、必要欄位不足、日期無效或已公布但號碼不完整的資料。`jackpot` 及 `derivedFirstPrizeDiv` 是可選金額；如官方暫時回傳 placeholder 或格式無效的值，Worker 會將該金額保存為 `null`，仍然寫入其他有效攋珠資料。
 
 ## 12. 後續 MVP 工作
 

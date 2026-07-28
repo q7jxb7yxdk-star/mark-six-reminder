@@ -22,7 +22,7 @@ Mark Six Reminder 是一個非官方的香港六合彩資訊 iOS App，顯示下
 - Cron 逢星期日、二、四、六香港時間 09:15 更新資料及判斷通知條件，21:45 更新結果，22:15 後備重試
 - 每個裝置每期最多通知一次
 - D1 持久化攪珠、訂閱及發送紀錄，KV 快取目前攪珠資料
-- Worker 單元測試、結構化 logging 及基本錯誤處理
+- Worker 單元測試、結構化 logging 及容錯處理；官方金額可包含 `$`、`HK$` 及千位分隔，金額暫時無效時仍會保存有效攋珠結果
 - 1024×1024、無 Alpha Channel 的自訂 App Icon；App Store Primary Category 使用 Reference
 
 尚待開發：
