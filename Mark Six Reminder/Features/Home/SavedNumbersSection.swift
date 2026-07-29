@@ -38,9 +38,12 @@ struct SavedNumbersSection: View {
         return Section {
             VStack(alignment: .leading, spacing: 12) {
                 if let result, result.hasPublishedResult, let specialNumber = result.specialNumber {
-                    Label("官方攪珠結果", systemImage: "checkmark.seal.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.red)
+                    Label(
+                        "第 \(group.drawNumber) 期攪珠結果",
+                        systemImage: "checkmark.seal.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.red)
 
                     officialResultRow(result.mainNumbers, specialNumber: specialNumber)
                 } else {
@@ -51,6 +54,7 @@ struct SavedNumbersSection: View {
             }
             .padding(.vertical, 16)
             .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 18))
             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 6, trailing: 16))
             .listRowBackground(Color.clear)
@@ -72,20 +76,6 @@ struct SavedNumbersSection: View {
                     }
                 }
             }
-        } header: {
-            HStack(spacing: 10) {
-                Image(systemName: "calendar.badge.clock")
-                    .foregroundStyle(.red)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("第\(group.drawNumber)期")
-                        .font(.headline)
-                    Text(DrawDateFormatter.hongKongDrawDate(group.drawDate))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .textCase(nil)
         }
     }
 
