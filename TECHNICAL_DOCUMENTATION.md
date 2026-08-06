@@ -94,6 +94,7 @@ Mark Six Reminder/
 │       ├── SettingsView.swift
 │       └── SettingsViewModel.swift
 ├── Models/
+│   ├── DrawSnapshotCache.swift
 │   ├── DrawInfo.swift
 │   ├── SavedNumberEntry.swift
 │   └── SavedNumberCleanup.swift
@@ -119,7 +120,11 @@ Mark Six Reminder/
 - 最近更新時間
 - 已儲存號碼及相應期數的官方核對結果
 
-首次進入首頁時自動載入；App 每次由背景返回前景時亦會自動更新目前攪珠及所有已儲存期數的結果。若 App 一直停留在前景，首頁會只針對尚未有完整結果的已儲存攪珠日期建立等待 Task，在香港時間 21:46 自動更新，仍未有結果時於 22:16 後備重試。Task 不會輪詢，進入背景或結果已完整時會自動取消。首頁不設獨立 toolbar 按鈕，但保留 pull-to-refresh 作手動後備。未設定 API URL、沒有資料或 request 失敗時，頁面顯示可重試錯誤狀態，不使用假資料。
+首次進入首頁時，`HomeViewModel` 先由 `DrawSnapshotCache` 還原最近一期及已公布的完整官方結果，讓頁面無需等待網絡才顯示已有資料。App 啟動或由背景返回前景時，若距離上次成功更新未滿 15 分鐘，便重用本機快取，不重複呼叫 Worker。
+
+已公布的完整結果視為不變資料，存入本機後不會再下載；首頁只對尚未有完整結果的已儲存期數發出 `GET /v1/draws/{drawID}`。快取以 actor 串行存取，多個 Swift concurrency Task 同時觸發時，`HomeViewModel` 亦會阻止同一期重複下載。本機編碼資料如損壞會自動清除，再按正常網絡流程取得。
+
+若 App 一直停留在前景，首頁會只針對尚未有完整結果的已儲存攪珠日期建立等待 Task，在香港時間 21:40 自動強制更新，仍未有結果時於 21:50 後備強制重試。如 App 在觸發時間位於背景，跨過其中一個時間後返回前景亦會繞過 15 分鐘限制立即更新。Task 不會輪詢，進入背景或結果已完整時會自動取消。首頁 pull-to-refresh 及錯誤狀態的「再試一次」不受 15 分鐘限制。未設定 API URL、沒有資料或 request 失敗時，頁面顯示可重試錯誤狀態，不使用假資料。
 
 首頁以紅色漸層突出估計頭獎基金，其餘資料及已儲存號碼使用共用卡片樣式。`AppCardStyle` 提供適應 Light／Dark Mode 的 material 背景、細邊框與陰影；`AppStatusMessage` 統一各頁面的處理中、成功、資訊及錯誤提示，避免每個頁面重複建立不同樣式。
 
@@ -133,6 +138,8 @@ App 設定使用 `UserDefaults`：
 | `notification.enabled` | 是否啟用通知 | `true` |
 | `notification.installationId` | 每次 App 安裝的穩定 UUID | 首次啟動產生 |
 | `savedNumbers.deleteOldNumbersEnabled` | 是否自動刪除舊期數號碼 | `false` |
+| `drawCache.current` | 最近目前一期及本機成功取得時間 | 無 |
+| `drawCache.publishedResults` | 已儲存期數的完整官方結果 | 無 |
 
 App 提供 $8,000,000、$13,000,000、$18,000,000 及 $25,000,000 四個固定選項，新安裝預設使用 $13,000,000。設定頁不提供自訂輸入或獨立的「目前門檻」列；勾號直接標示目前選項。已安裝用戶如已有舊自訂門檻，更新後會保留原值，直至用戶選擇新的固定門檻。
 
@@ -159,7 +166,7 @@ Debug build 註冊為 `sandbox`，Release build 註冊為 `production`。Worker 
 
 用戶按「儲存號碼」時，App 先讀取目前下一期攪珠，把官方 `drawID`、期數、日期及六個號碼寫入本機 `SavedNumberEntry`。同一期可保存多組號碼，但完全相同的一組不會重複建立。現有六個整數欄位繼續保留，確保舊 SwiftData 記錄可向後兼容；新記錄另以簡單逗號分隔文字保存原始選號及玩法。這些號碼不會上傳到 Worker。
 
-首頁以 SwiftData `@Query` 顯示已儲存號碼，並呼叫 `GET /v1/draws/{drawID}` 讀取該期官方結果。`SavedNumbersSection` 按 `drawID` 把多組號碼分組，不另行顯示重複的期數及攪珠日期 section header；已公布結果以「第 26/070 期攪珠結果」為標題，每一期只顯示一次六個官方正選號碼及特別號碼。各組號碼再按儲存先後以「26/070 期，第 1 組・單式」格式標示期數、組別及玩法並逐一核對。每組命中的球以完整金色外框標示，結果列顯示獎項資格或「未獲獎」；用戶可向左滑動刪除個別記錄。未公布結果時顯示「等待官方攪珠結果」。
+首頁以 SwiftData `@Query` 顯示已儲存號碼，並只在本機沒有完整結果時呼叫 `GET /v1/draws/{drawID}` 讀取該期官方結果。`SavedNumbersSection` 按 `drawID` 把多組號碼分組，不另行顯示重複的期數及攪珠日期 section header；已公布結果以「第 26/070 期攪珠結果」為標題，每一期只顯示一次六個官方正選號碼及特別號碼。各組號碼再按儲存先後以「26/070 期，第 1 組・單式」格式標示期數、組別及玩法並逐一核對。每組命中的球以完整金色外框標示，結果列顯示獎項資格或「未獲獎」；用戶可向左滑動刪除個別記錄。未公布結果時顯示「等待官方攪珠結果」。
 
 `MarkSixNumberBall` 是可重用的 SwiftUI 元件，按六合彩標準號碼分組顯示紅、藍或綠球。元件以 SwiftUI 漸層、白色中央區域及黑色數字自行繪製，不包含或下載香港賽馬會的 SVG、Logo 或其他圖片資產，並為 VoiceOver 提供球色及號碼標籤。
 
@@ -281,11 +288,11 @@ Cron：
 
 ```text
 15 1 * * SUN,TUE,THU,SAT
-45 13 * * SUN,TUE,THU,SAT
-15 14 * * SUN,TUE,THU,SAT
+39 13 * * SUN,TUE,THU,SAT
+49 13 * * SUN,TUE,THU,SAT
 ```
 
-Cloudflare Cron 使用 UTC。以上分別等同香港時間逢星期日、星期二、星期四及星期六 09:15、21:45 及 22:15。09:15 排程更新資料及判斷 APNs 通知；21:45 排程更新攪珠結果；22:15 是官方結果延遲時的後備重試。兩個晚間排程只更新 D1/KV，不會發送頭獎基金通知。
+Cloudflare Cron 使用 UTC。以上分別等同香港時間逢星期日、星期二、星期四及星期六 09:15、21:39 及 21:49。09:15 排程更新資料及判斷 APNs 通知；21:39 排程更新攪珠結果；21:49 是官方結果延遲時的後備重試。兩個晚間排程只更新 D1/KV，不會發送頭獎基金通知；App 會分別於 21:40 及 21:50 讀取更新後資料。
 
 Worker 只會在這四個可能的攪珠星期執行；通知服務仍會比較官方 `drawDate` 與香港當日日期，因此沒有攪珠的星期六或星期日不會發送通知。
 

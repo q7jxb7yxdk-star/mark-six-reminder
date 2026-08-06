@@ -1,7 +1,7 @@
 import Foundation
 
 /// A stable representation of a Mark Six draw returned by the Worker.
-struct DrawInfo: Decodable, Equatable, Identifiable, Sendable {
+struct DrawInfo: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let drawNumber: String
     let drawDate: String
@@ -15,7 +15,7 @@ struct DrawInfo: Decodable, Equatable, Identifiable, Sendable {
     let sourceURL: String
 
     /// Indicates whether the Worker has a complete official six-plus-special result.
-    var hasPublishedResult: Bool {
+    nonisolated var hasPublishedResult: Bool {
         mainNumbers.count == 6 && specialNumber != nil
     }
 }

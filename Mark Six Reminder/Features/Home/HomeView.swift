@@ -30,7 +30,10 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .task {
-            await model.loadIfNeeded(drawIDs: savedDrawIDs)
+            await model.loadIfNeeded(
+                drawIDs: savedDrawIDs,
+                pendingDrawDates: pendingResultDrawDates
+            )
         }
         .task(id: automaticRefreshTaskID) {
             guard scenePhase == .active else {
@@ -56,7 +59,10 @@ struct HomeView: View {
             }
 
             Task {
-                await model.refresh(drawIDs: savedDrawIDs)
+                await model.refresh(
+                    drawIDs: savedDrawIDs,
+                    pendingDrawDates: pendingResultDrawDates
+                )
             }
         }
         .alert("未能刪除舊號碼", isPresented: cleanupErrorIsPresented) {
@@ -115,7 +121,7 @@ struct HomeView: View {
         .scrollContentBackground(.hidden)
         .background(Color.primary.opacity(0.025))
         .refreshable {
-            await model.refresh(drawIDs: savedDrawIDs)
+            await model.refresh(drawIDs: savedDrawIDs, force: true)
         }
     }
 
@@ -236,7 +242,7 @@ struct HomeView: View {
         } actions: {
             Button("再試一次") {
                 Task {
-                    await model.refresh(drawIDs: savedDrawIDs)
+                    await model.refresh(drawIDs: savedDrawIDs, force: true)
                 }
             }
         }

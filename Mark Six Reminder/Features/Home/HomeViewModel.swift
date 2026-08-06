@@ -5,6 +5,8 @@ import Observation
 @MainActor
 @Observable
 final class HomeViewModel {
+    private static let automaticRefreshInterval: TimeInterval = 15 * 60
+
     private static let hongKongTimeZone = TimeZone(identifier: "Asia/Hong_Kong")!
 
     private static let iso8601Formatter = ISO8601DateFormatter()
@@ -21,26 +23,43 @@ final class HomeViewModel {
     private(set) var errorMessage: String?
 
     private let apiClient: JackpotAPIClient?
+    private let cache: DrawSnapshotCache
     private var hasLoaded = false
+    private var lastSuccessfulRefreshAt: Date?
+    private var resultIDsBeingFetched: Set<String> = []
 
     /// Creates a homepage model from the current app configuration.
-    init(apiClient: JackpotAPIClient? = AppConfiguration.apiBaseURL.map(JackpotAPIClient.init)) {
+    init(
+        apiClient: JackpotAPIClient? = AppConfiguration.apiBaseURL.map(JackpotAPIClient.init),
+        cache: DrawSnapshotCache = .shared
+    ) {
         self.apiClient = apiClient
+        self.cache = cache
     }
 
     /// Loads once when the homepage first appears.
-    func loadIfNeeded(drawIDs: [String]) async {
+    func loadIfNeeded(drawIDs: [String], pendingDrawDates: [String]) async {
         guard !hasLoaded else {
             return
         }
 
         hasLoaded = true
-        await refresh(drawIDs: drawIDs)
+        await restoreCachedData(drawIDs: drawIDs)
+        await refresh(drawIDs: drawIDs, pendingDrawDates: pendingDrawDates)
     }
 
-    /// Replaces the visible snapshot and saved-entry results with Worker responses.
-    func refresh(drawIDs: [String]) async {
+    /// Refreshes Worker data unless a recent automatic refresh can be reused safely.
+    func refresh(
+        drawIDs: [String],
+        pendingDrawDates: [String] = [],
+        force: Bool = false
+    ) async {
         guard !isLoading else {
+            return
+        }
+
+        if !force, canReuseRecentRefresh(pendingDrawDates: pendingDrawDates) {
+            await restoreCachedResults(drawIDs: drawIDs)
             return
         }
 
@@ -54,7 +73,11 @@ final class HomeViewModel {
         defer { isLoading = false }
 
         do {
-            draw = try await apiClient.currentDraw()
+            let fetchedDraw = try await apiClient.currentDraw()
+            let fetchedAt = Date()
+            draw = fetchedDraw
+            lastSuccessfulRefreshAt = fetchedAt
+            await cache.saveCurrentDraw(fetchedDraw, fetchedAt: fetchedAt)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -62,17 +85,27 @@ final class HomeViewModel {
         await loadResults(for: drawIDs)
     }
 
-    /// Fetches each distinct saved draw without making one failed result hide the homepage.
+    /// Restores immutable results locally and only fetches draws which remain unpublished.
     func loadResults(for drawIDs: [String]) async {
+        await restoreCachedResults(drawIDs: drawIDs)
+
         guard let apiClient else {
             return
         }
 
         let requestedIDs = Set(drawIDs)
-        drawsByID = drawsByID.filter { requestedIDs.contains($0.key) }
+        let fetchableIDs = requestedIDs.filter { drawID in
+            drawsByID[drawID]?.hasPublishedResult != true
+                && !resultIDsBeingFetched.contains(drawID)
+        }
+        guard !fetchableIDs.isEmpty else {
+            return
+        }
+
+        resultIDsBeingFetched.formUnion(fetchableIDs)
 
         let fetchedDraws = await withTaskGroup(of: DrawInfo?.self) { group in
-            for drawID in requestedIDs {
+            for drawID in fetchableIDs {
                 group.addTask {
                     try? await apiClient.draw(id: drawID)
                 }
@@ -86,10 +119,12 @@ final class HomeViewModel {
             }
             return values
         }
+        resultIDsBeingFetched.subtract(fetchableIDs)
 
         for fetchedDraw in fetchedDraws {
             drawsByID[fetchedDraw.id] = fetchedDraw
         }
+        await cache.savePublishedResults(fetchedDraws)
     }
 
     /// Returns the latest Worker snapshot for one locally saved entry.
@@ -117,16 +152,82 @@ final class HomeViewModel {
             guard !Task.isCancelled else {
                 return
             }
-            await refresh(drawIDs: drawIDs)
+            await refresh(drawIDs: drawIDs, force: true)
         }
     }
 
-    /// Finds the next 21:46 or 22:16 Hong Kong refresh for saved draw dates.
+    /// Restores the latest current draw and published saved-draw results before networking.
+    private func restoreCachedData(drawIDs: [String]) async {
+        if let cachedCurrentDraw = await cache.currentDraw() {
+            draw = cachedCurrentDraw.draw
+            lastSuccessfulRefreshAt = cachedCurrentDraw.fetchedAt
+        }
+        await restoreCachedResults(drawIDs: drawIDs)
+    }
+
+    /// Replaces requested result state with complete results persisted on this device.
+    private func restoreCachedResults(drawIDs: [String]) async {
+        let requestedIDs = Set(drawIDs)
+        drawsByID = drawsByID.filter { requestedIDs.contains($0.key) }
+
+        let cachedResults = await cache.publishedResults(for: requestedIDs)
+        drawsByID.merge(cachedResults) { _, cached in cached }
+        await cache.retainPublishedResults(for: requestedIDs)
+    }
+
+    /// Indicates whether automatic refresh can avoid repeating recent network work safely.
+    private func canReuseRecentRefresh(pendingDrawDates: [String]) -> Bool {
+        guard let lastSuccessfulRefreshAt else {
+            return false
+        }
+
+        let now = Date()
+        let elapsed = now.timeIntervalSince(lastSuccessfulRefreshAt)
+        guard elapsed >= 0 && elapsed < Self.automaticRefreshInterval else {
+            return false
+        }
+
+        return !Self.resultRefreshTimePassed(
+            drawDates: pendingDrawDates,
+            after: lastSuccessfulRefreshAt,
+            through: now
+        )
+    }
+
+    /// Detects whether 21:40 or 21:50 passed while the app was backgrounded or throttled.
+    private static func resultRefreshTimePassed(
+        drawDates: [String],
+        after previousRefresh: Date,
+        through now: Date
+    ) -> Bool {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = hongKongTimeZone
+
+        let triggerTimes = [(hour: 21, minute: 40), (hour: 21, minute: 50)]
+        return Set(drawDates).compactMap(parseISO8601).contains { drawDate in
+            let dateComponents = calendar.dateComponents([.year, .month, .day], from: drawDate)
+            return triggerTimes.contains { triggerTime in
+                var components = dateComponents
+                components.calendar = calendar
+                components.timeZone = hongKongTimeZone
+                components.hour = triggerTime.hour
+                components.minute = triggerTime.minute
+                components.second = 0
+
+                guard let triggerDate = calendar.date(from: components) else {
+                    return false
+                }
+                return triggerDate > previousRefresh && triggerDate <= now
+            }
+        }
+    }
+
+    /// Finds the next 21:40 or 21:50 Hong Kong refresh for saved draw dates.
     private static func nextResultRefreshDate(drawDates: [String], after now: Date) -> Date? {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = hongKongTimeZone
 
-        let triggerTimes = [(hour: 21, minute: 46), (hour: 22, minute: 16)]
+        let triggerTimes = [(hour: 21, minute: 40), (hour: 21, minute: 50)]
         let candidates = Set(drawDates).compactMap(parseISO8601).flatMap { drawDate in
             let dateComponents = calendar.dateComponents([.year, .month, .day], from: drawDate)
             return triggerTimes.compactMap { triggerTime -> Date? in

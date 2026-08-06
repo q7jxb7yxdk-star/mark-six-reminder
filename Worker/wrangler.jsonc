@@ -23,8 +23,8 @@
   "triggers": {
     "crons": [
       "15 1 * * SUN,TUE,THU,SAT",
-      "45 13 * * SUN,TUE,THU,SAT",
-      "15 14 * * SUN,TUE,THU,SAT"
+      "39 13 * * SUN,TUE,THU,SAT",
+      "49 13 * * SUN,TUE,THU,SAT"
     ]
   },
   "observability": {
@@ -55,8 +55,8 @@
       "triggers": {
         "crons": [
           "15 1 * * SUN,TUE,THU,SAT",
-          "45 13 * * SUN,TUE,THU,SAT",
-          "15 14 * * SUN,TUE,THU,SAT"
+          "39 13 * * SUN,TUE,THU,SAT",
+          "49 13 * * SUN,TUE,THU,SAT"
         ]
       }
     }
