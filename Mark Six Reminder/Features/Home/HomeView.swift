@@ -46,7 +46,7 @@ struct HomeView: View {
             )
         }
         .task(id: oldNumberCleanupTaskID) {
-            deleteOldSavedNumbersIfNeeded()
+            await runOldNumberCleanupIfNeeded()
         }
         .onChange(of: savedDrawIDs) { _, newDrawIDs in
             Task {
@@ -150,17 +150,36 @@ struct HomeView: View {
         return "\(appState)|\(savedDrawIDs.joined(separator: ","))|\(pendingResultDrawDates.joined(separator: ","))"
     }
 
-    /// Restarts local cleanup when its setting, current draw or saved entries change.
+    /// Restarts local cleanup when app state, its setting, current draw or saved entries change.
     private var oldNumberCleanupTaskID: String {
+        let appState = scenePhase == .active ? "active" : "inactive"
         let setting = settings.deleteOldNumbersEnabled ? "on" : "off"
         let currentDrawID = model.draw?.id ?? "none"
         let entryIDs = savedEntries.map(\.id.uuidString).sorted().joined(separator: ",")
-        return "\(setting)|\(currentDrawID)|\(entryIDs)"
+        return "\(appState)|\(setting)|\(currentDrawID)|\(entryIDs)"
     }
 
-    /// Removes selections older than the current draw only when the user enabled cleanup.
-    private func deleteOldSavedNumbersIfNeeded() {
-        guard settings.deleteOldNumbersEnabled, let draw = model.draw else {
+    /// Waits for the next Hong Kong draw day before removing older selections.
+    private func runOldNumberCleanupIfNeeded() async {
+        guard
+            scenePhase == .active,
+            settings.deleteOldNumbersEnabled,
+            let draw = model.draw,
+            let cleanupDate = SavedNumberCleanup.cleanupDate(for: draw)
+        else {
+            return
+        }
+
+        let delay = cleanupDate.timeIntervalSinceNow
+        if delay > 0 {
+            do {
+                try await Task.sleep(for: .seconds(delay), tolerance: .seconds(1))
+            } catch {
+                return
+            }
+        }
+
+        guard !Task.isCancelled, scenePhase == .active else {
             return
         }
 

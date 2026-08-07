@@ -4,6 +4,8 @@ import SwiftData
 /// Removes locally saved selections which precede the current official draw.
 @MainActor
 enum SavedNumberCleanup {
+    private static let hongKongTimeZone = TimeZone(identifier: "Asia/Hong_Kong")!
+
     private static let iso8601Formatter = ISO8601DateFormatter()
 
     private static let fractionalISO8601Formatter: ISO8601DateFormatter = {
@@ -12,13 +14,29 @@ enum SavedNumberCleanup {
         return formatter
     }()
 
-    /// Deletes entries with a valid draw date earlier than the supplied current draw.
+    /// Returns the start of the supplied draw day in Hong Kong.
+    static func cleanupDate(for currentDraw: DrawInfo) -> Date? {
+        guard let currentDrawDate = parseISO8601(currentDraw.drawDate) else {
+            return nil
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = hongKongTimeZone
+        return calendar.startOfDay(for: currentDrawDate)
+    }
+
+    /// Deletes older entries only after the supplied current draw day begins in Hong Kong.
     static func deleteEntries(
         before currentDraw: DrawInfo,
         from entries: [SavedNumberEntry],
-        in modelContext: ModelContext
+        in modelContext: ModelContext,
+        asOf now: Date = Date()
     ) throws {
-        guard let currentDrawDate = parseISO8601(currentDraw.drawDate) else {
+        guard
+            let currentDrawDate = parseISO8601(currentDraw.drawDate),
+            let cleanupDate = cleanupDate(for: currentDraw),
+            now >= cleanupDate
+        else {
             return
         }
 
