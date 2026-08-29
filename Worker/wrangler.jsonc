@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "HKJC_GRAPHQL_URL": "https://info.cld.hkjc.com/graphql/base/",
-    "APNS_TOPIC": "Sunny.Mark-Six-Reminder"
+    "APNS_TOPIC": "com.sunny.mark-six-reminder"
   },
   "kv_namespaces": [
     {
@@ -36,7 +36,7 @@
       "name": "mark-six-reminder-api-staging",
       "vars": {
         "HKJC_GRAPHQL_URL": "https://info.cld.hkjc.com/graphql/base/",
-        "APNS_TOPIC": "Sunny.Mark-Six-Reminder"
+        "APNS_TOPIC": "com.sunny.mark-six-reminder"
       },
       "kv_namespaces": [
         {
@@ -49,6 +49,30 @@
           "binding": "DB",
           "database_name": "jackpot-alert-staging",
           "database_id": "4d54edfc-d2f8-4ec6-a68f-4f1235fc0c28",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "triggers": {
+        "crons": []
+      }
+    },
+    "production": {
+      "name": "mark-six-reminder-api",
+      "vars": {
+        "HKJC_GRAPHQL_URL": "https://info.cld.hkjc.com/graphql/base/",
+        "APNS_TOPIC": "com.sunny.mark-six-reminder"
+      },
+      "kv_namespaces": [
+        {
+          "binding": "DRAW_CACHE",
+          "id": "24b546d795a847579a2b2c1754d5eb71"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "jackpot-alert-production",
+          "database_id": "965f570c-a51e-40aa-8e72-4d54f3b61125",
           "migrations_dir": "migrations"
         }
       ],

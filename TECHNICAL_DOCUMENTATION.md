@@ -410,10 +410,11 @@ Request：
 
 | Setting | Debug | Release |
 |---|---|---|
-| `JACKPOT_API_BASE_URL` | staging URL | 上架前必須設定 production URL |
+| `JACKPOT_API_BASE_URL` | production URL | production URL |
 | `APS_ENVIRONMENT` | `development` | `production` |
 
 `AppConfiguration` 只接受 HTTPS；HTTP 只允許 `localhost`、`127.0.0.1` 或 `::1`，避免正式 App 誤用明文遠端連線。
+Debug 與 Release 共用 production draw API，使 Simulator 與正式版本讀取相同公開攪珠資料；APNs environment 仍按 build configuration 分開。
 
 ### 9.2 Worker non-secret vars
 
@@ -437,6 +438,9 @@ cd Worker
 npx wrangler secret put APNS_KEY_ID --env staging
 npx wrangler secret put APNS_TEAM_ID --env staging
 npx wrangler secret put APNS_PRIVATE_KEY --env staging
+npx wrangler secret put APNS_KEY_ID --env production
+npx wrangler secret put APNS_TEAM_ID --env production
+npx wrangler secret put APNS_PRIVATE_KEY --env production
 ```
 
 `.p8` 私鑰只可在 Apple Developer 下載一次。不要把私鑰、secret 值、`.dev.vars` 或 APNs token 提交到 Git、加入文件或寫入 log。
@@ -463,23 +467,28 @@ npm run check
 ```bash
 cd Worker
 npx wrangler d1 migrations apply jackpot-alert-staging --env staging --remote
+npx wrangler d1 migrations apply jackpot-alert-production --env production --remote
 ```
 
 先 migration，後部署 Worker，避免新程式先使用尚未存在的 table。
 
-### 10.3 Staging 部署
+### 10.3 Worker 部署
 
 ```bash
 cd Worker
 npx wrangler deploy --env staging
+npx wrangler deploy --env production
 ```
 
-部署後檢查：
+Staging 使用獨立 KV/D1 並停用 Cron；production 啟用 09:15、21:39 及 21:49（香港時間）的自動更新排程。部署後分別檢查：
 
 ```bash
 curl https://mark-six-reminder-api-staging.sonicman.workers.dev/health
 curl https://mark-six-reminder-api-staging.sonicman.workers.dev/v1/draws/current
 npx wrangler tail --env staging
+curl https://mark-six-reminder-api.sonicman.workers.dev/health
+curl https://mark-six-reminder-api.sonicman.workers.dev/v1/draws/current
+npx wrangler tail --env production
 ```
 
 不要在無確認通知條件及 delivery 狀態時反覆手動觸發 production scheduled handler。
@@ -524,7 +533,6 @@ npx wrangler tail --env staging
 
 1. 完整「我的投注」管理頁面。
 2. 隨機號碼複製功能。
-3. production Worker、production KV/D1、Release API URL 及 App Store 上架設定。
 
 新增以上功能時應維持目前原則：功能按 feature 分檔、ViewModel 只管理畫面狀態、網絡及 persistence 保持獨立、避免 God Object，也不引入不必要的第三方 library。
 
@@ -537,4 +545,5 @@ npx wrangler tail --env staging
 - App Icon 使用自製圖像，標準版本為 1024×1024 PNG、無 Alpha Channel，並由系統套用圓角遮罩。
 - 提供可公開存取的 Privacy Policy 及 Support URL。
 - Privacy nutrition label 必須與實際收集資料一致；目前 backend 保存 installation ID、APNs device token、門檻及通知狀態。
+- App 只使用系統 HTTPS 與 APNs，`ITSAppUsesNonExemptEncryption` 設為 `false`。
 - 上架前使用 production APNs entitlement、production Worker URL 及 production 資源完成實機測試。

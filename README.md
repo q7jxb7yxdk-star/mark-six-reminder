@@ -24,13 +24,13 @@ Mark Six Reminder 是一個非官方的香港六合彩資訊 iOS App，顯示下
 - 每個裝置每期最多通知一次
 - D1 持久化攪珠、訂閱及發送紀錄，KV 快取目前攪珠資料
 - Worker 單元測試、結構化 logging 及容錯處理；官方金額可包含 `$`、`HK$` 及千位分隔，金額暫時無效時仍會保存有效攪珠結果
+- production Worker、production KV/D1，以及 Debug／Release 共用的 production API URL
 - 1024×1024、無 Alpha Channel 的自訂 App Icon；App Store Primary Category 使用 Reference
 
 尚待開發：
 
 - 隨機號碼複製功能
 - 「我的投注」頁面
-- production Worker、production 儲存資源及 Release API URL
 
 ## 技術架構
 
@@ -80,14 +80,14 @@ Worker 與本機 OpenCode 的六合彩 Telegram tracker 是兩套獨立流程。
 2. 選擇可使用 Push Notifications 的 Apple Developer Team。
 3. 確認 Bundle Identifier 與 Worker 的 `APNS_TOPIC` 相同。
 4. Debug build 使用 APNs sandbox；Release build 使用 APNs production。
-5. Debug 的 `JACKPOT_API_BASE_URL` 目前指向 staging Worker；Release 必須在上架前填入 production HTTPS URL。
+5. Debug 與 Release 的 `JACKPOT_API_BASE_URL` 均指向 production Worker，確保 Simulator 與正式版本取得相同公開攪珠資料。
 6. 使用實體 iPhone 完成上架前 APNs 測試；開發期間亦可用支援 remote notifications 的 Simulator 驗證註冊流程。
 7. 設定頁會在等待 APNs token 時顯示註冊狀態；若系統註冊失敗，會直接顯示錯誤而不會靜默等待。
 
 目前設定：
 
-- Bundle Identifier：`Sunny.Mark-Six-Reminder`
-- Staging API：`https://mark-six-reminder-api-staging.sonicman.workers.dev`
+- Bundle Identifier：`com.sunny.mark-six-reminder`
+- Production API：`https://mark-six-reminder-api.sonicman.workers.dev`
 - 最低支援版本：iOS 26.0
 
 ## Worker 本機開發
@@ -105,9 +105,16 @@ npm run dev
 
 ## Cloudflare 設定
 
-Staging environment 使用：
+Staging environment 使用獨立的 Worker、KV 及 D1，並停用自動 Cron，供手動驗證：
 
 - Worker：`mark-six-reminder-api-staging`
+- KV binding：`DRAW_CACHE`
+- D1 binding：`DB`
+- Cron：停用
+
+Production environment 使用：
+
+- Worker：`mark-six-reminder-api`
 - KV binding：`DRAW_CACHE`
 - D1 binding：`DB`
 - 通知 Cron：`15 1 * * SUN,TUE,THU,SAT`（UTC，即香港時間 09:15）
@@ -128,6 +135,8 @@ APNS_PRIVATE_KEY
 cd Worker
 npx wrangler d1 migrations apply jackpot-alert-staging --env staging --remote
 npx wrangler deploy --env staging
+npx wrangler d1 migrations apply jackpot-alert-production --env production --remote
+npx wrangler deploy --env production
 ```
 
 部署前先執行：
