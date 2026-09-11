@@ -435,9 +435,6 @@ APNS_PRIVATE_KEY
 
 ```bash
 cd Worker
-npx wrangler secret put APNS_KEY_ID --env staging
-npx wrangler secret put APNS_TEAM_ID --env staging
-npx wrangler secret put APNS_PRIVATE_KEY --env staging
 npx wrangler secret put APNS_KEY_ID --env production
 npx wrangler secret put APNS_TEAM_ID --env production
 npx wrangler secret put APNS_PRIVATE_KEY --env production
@@ -466,7 +463,6 @@ npm run check
 
 ```bash
 cd Worker
-npx wrangler d1 migrations apply jackpot-alert-staging --env staging --remote
 npx wrangler d1 migrations apply jackpot-alert-production --env production --remote
 ```
 
@@ -476,16 +472,12 @@ npx wrangler d1 migrations apply jackpot-alert-production --env production --rem
 
 ```bash
 cd Worker
-npx wrangler deploy --env staging
 npx wrangler deploy --env production
 ```
 
-Staging 使用獨立 KV/D1 並停用 Cron；production 啟用 09:15、21:39 及 21:49（香港時間）的自動更新排程。部署後分別檢查：
+Production 啟用 09:15、21:39 及 21:49（香港時間）的自動更新排程。部署後檢查：
 
 ```bash
-curl https://mark-six-reminder-api-staging.sonicman.workers.dev/health
-curl https://mark-six-reminder-api-staging.sonicman.workers.dev/v1/draws/current
-npx wrangler tail --env staging
 curl https://mark-six-reminder-api.sonicman.workers.dev/health
 curl https://mark-six-reminder-api.sonicman.workers.dev/v1/draws/current
 npx wrangler tail --env production

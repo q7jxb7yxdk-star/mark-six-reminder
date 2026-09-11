@@ -32,30 +32,6 @@
     "head_sampling_rate": 1
   },
   "env": {
-    "staging": {
-      "name": "mark-six-reminder-api-staging",
-      "vars": {
-        "HKJC_GRAPHQL_URL": "https://info.cld.hkjc.com/graphql/base/",
-        "APNS_TOPIC": "com.sunny.mark-six-reminder"
-      },
-      "kv_namespaces": [
-        {
-          "binding": "DRAW_CACHE",
-          "id": "98894f5d1e67447dae353d1c9f93a4f6"
-        }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "jackpot-alert-staging",
-          "database_id": "4d54edfc-d2f8-4ec6-a68f-4f1235fc0c28",
-          "migrations_dir": "migrations"
-        }
-      ],
-      "triggers": {
-        "crons": []
-      }
-    },
     "production": {
       "name": "mark-six-reminder-api",
       "vars": {

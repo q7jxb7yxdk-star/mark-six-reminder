@@ -105,13 +105,6 @@ npm run dev
 
 ## Cloudflare 設定
 
-Staging environment 使用獨立的 Worker、KV 及 D1，並停用自動 Cron，供手動驗證：
-
-- Worker：`mark-six-reminder-api-staging`
-- KV binding：`DRAW_CACHE`
-- D1 binding：`DB`
-- Cron：停用
-
 Production environment 使用：
 
 - Worker：`mark-six-reminder-api`
@@ -133,8 +126,6 @@ APNS_PRIVATE_KEY
 
 ```bash
 cd Worker
-npx wrangler d1 migrations apply jackpot-alert-staging --env staging --remote
-npx wrangler deploy --env staging
 npx wrangler d1 migrations apply jackpot-alert-production --env production --remote
 npx wrangler deploy --env production
 ```
