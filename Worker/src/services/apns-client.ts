@@ -1,4 +1,5 @@
 import type {
+  APNsEnvironment,
   JackpotNotification,
   NotificationSender,
   NotificationSendResult,
@@ -13,6 +14,9 @@ export interface APNsConfiguration {
   topic: string;
 }
 
+/** Keeps credentials isolated because current APNs signing keys are environment-specific. */
+export type APNsConfigurations = Record<APNsEnvironment, APNsConfiguration>;
+
 interface APNsErrorPayload {
   reason?: string;
 }
@@ -25,28 +29,33 @@ const PERMANENT_TOKEN_ERRORS = new Set([
 
 /** Sends token-authenticated HTTP/2 requests to Apple's Push Notification service. */
 export class APNsClient implements NotificationSender {
-  private providerToken: string | null = null;
+  private readonly providerTokens: Partial<Record<APNsEnvironment, string>> = {};
 
-  /** Creates a sender from secrets loaded at Worker execution time. */
-  constructor(private readonly configuration: APNsConfiguration) {}
+  /** Creates a sender from environment-specific secrets loaded at Worker execution time. */
+  constructor(
+    private readonly configurations: APNsConfigurations,
+    private readonly fetcher: typeof fetch = fetch,
+  ) {}
 
   /** Sends one visible jackpot notification and normalizes the APNs result. */
   async send(
     subscription: NotificationSubscription,
     notification: JackpotNotification,
   ): Promise<NotificationSendResult> {
-    const providerToken = await this.getProviderToken();
-    const host = subscription.apnsEnvironment === "sandbox"
+    const environment = subscription.apnsEnvironment;
+    const configuration = this.configurations[environment];
+    const providerToken = await this.getProviderToken(environment, configuration);
+    const host = environment === "sandbox"
       ? "https://api.sandbox.push.apple.com"
       : "https://api.push.apple.com";
-    const response = await fetch(`${host}/3/device/${subscription.deviceToken}`, {
+    const response = await this.fetcher(`${host}/3/device/${subscription.deviceToken}`, {
       method: "POST",
       headers: {
         authorization: `bearer ${providerToken}`,
         "apns-collapse-id": notification.draw.id.slice(0, 64),
         "apns-priority": "10",
         "apns-push-type": "alert",
-        "apns-topic": this.configuration.topic,
+        "apns-topic": configuration.topic,
         "content-type": "application/json",
       },
       body: JSON.stringify(makePayload(notification)),
@@ -65,18 +74,22 @@ export class APNsClient implements NotificationSender {
   }
 
   /** Reuses one short-lived provider JWT within the current scheduled execution. */
-  private async getProviderToken(): Promise<string> {
-    if (this.providerToken) {
-      return this.providerToken;
+  private async getProviderToken(
+    environment: APNsEnvironment,
+    configuration: APNsConfiguration,
+  ): Promise<string> {
+    const cachedToken = this.providerTokens[environment];
+    if (cachedToken) {
+      return cachedToken;
     }
 
     const issuedAt = Math.floor(Date.now() / 1_000);
-    const header = base64URL(JSON.stringify({ alg: "ES256", kid: this.configuration.keyId }));
-    const claims = base64URL(JSON.stringify({ iss: this.configuration.teamId, iat: issuedAt }));
+    const header = base64URL(JSON.stringify({ alg: "ES256", kid: configuration.keyId }));
+    const claims = base64URL(JSON.stringify({ iss: configuration.teamId, iat: issuedAt }));
     const unsignedToken = `${header}.${claims}`;
     const privateKey = await crypto.subtle.importKey(
       "pkcs8",
-      decodePrivateKey(this.configuration.privateKey),
+      decodePrivateKey(configuration.privateKey),
       { name: "ECDSA", namedCurve: "P-256" },
       false,
       ["sign"],
@@ -87,8 +100,9 @@ export class APNsClient implements NotificationSender {
       new TextEncoder().encode(unsignedToken),
     );
 
-    this.providerToken = `${unsignedToken}.${base64URL(signature)}`;
-    return this.providerToken;
+    const providerToken = `${unsignedToken}.${base64URL(signature)}`;
+    this.providerTokens[environment] = providerToken;
+    return providerToken;
   }
 }
 

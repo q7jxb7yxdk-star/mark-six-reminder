@@ -1,7 +1,7 @@
 import { APIRequestError, routeRequest } from "./api/router";
 import { DrawRepository } from "./repositories/draw-repository";
 import { NotificationRepository } from "./repositories/notification-repository";
-import { APNsClient, type APNsConfiguration } from "./services/apns-client";
+import { APNsClient, type APNsConfigurations } from "./services/apns-client";
 import { DrawUpdateService } from "./services/draw-update-service";
 import { NotificationService } from "./services/notification-service";
 import { HKJCSourceClient } from "./sources/hkjc-source-client";
@@ -80,25 +80,43 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 interface APNsSecretBindings {
+  /** Existing production APNs credentials. */
   APNS_KEY_ID?: string;
   APNS_TEAM_ID?: string;
   APNS_PRIVATE_KEY?: string;
+  /** Sandbox credentials used by Xcode Debug installations. */
+  APNS_SANDBOX_KEY_ID?: string;
+  APNS_SANDBOX_PRIVATE_KEY?: string;
 }
 
-/** Creates an APNs sender only when all required secrets are available. */
+/** Creates an APNs sender only when credentials for both gateways are available. */
 function makeAPNsClient(env: Env): APNsClient | null {
   const bindings = env as Env & APNsSecretBindings;
-  if (!bindings.APNS_KEY_ID || !bindings.APNS_TEAM_ID || !bindings.APNS_PRIVATE_KEY) {
+  if (
+    !bindings.APNS_KEY_ID ||
+    !bindings.APNS_TEAM_ID ||
+    !bindings.APNS_PRIVATE_KEY ||
+    !bindings.APNS_SANDBOX_KEY_ID ||
+    !bindings.APNS_SANDBOX_PRIVATE_KEY
+  ) {
     return null;
   }
 
-  const configuration: APNsConfiguration = {
-    keyId: bindings.APNS_KEY_ID,
-    teamId: bindings.APNS_TEAM_ID,
-    privateKey: bindings.APNS_PRIVATE_KEY,
-    topic: env.APNS_TOPIC,
+  const configurations: APNsConfigurations = {
+    sandbox: {
+      keyId: bindings.APNS_SANDBOX_KEY_ID,
+      teamId: bindings.APNS_TEAM_ID,
+      privateKey: bindings.APNS_SANDBOX_PRIVATE_KEY,
+      topic: env.APNS_TOPIC,
+    },
+    production: {
+      keyId: bindings.APNS_KEY_ID,
+      teamId: bindings.APNS_TEAM_ID,
+      privateKey: bindings.APNS_PRIVATE_KEY,
+      topic: env.APNS_TOPIC,
+    },
   };
-  return new APNsClient(configuration);
+  return new APNsClient(configurations);
 }
 
 /** Writes errors as structured JSON without leaking response bodies. */

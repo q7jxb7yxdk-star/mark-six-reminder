@@ -20,7 +20,7 @@ Mark Six Reminder 是一個非官方的香港六合彩資訊 iOS App，顯示下
 - App 首次進入首頁時先顯示本機快取；啟動或由背景返回前景時，距上次成功更新未滿 15 分鐘則不重複呼叫 Worker。攪珠日 21:40 及 21:50 的結果更新、跨過該時間後返回前景，以及用戶下拉重新整理仍會強制更新
 - 已公布的完整官方攪珠結果會保存在用戶裝置，後續只查詢尚未公布結果的已儲存期數
 - Cloudflare Worker 透過香港賽馬會網頁所使用的 GraphQL 端點取得及驗證資料
-- Cron 逢星期日、二、四、六香港時間 09:15 更新資料及判斷通知條件，21:39 更新結果，21:49 後備重試
+- Cron 逢星期日、二、四、六香港時間 09:15 更新資料及判斷通知條件，21:40、21:50 及 22:00 更新結果與最新估計頭獎基金
 - 每個裝置每期最多通知一次
 - D1 持久化攪珠、訂閱及發送紀錄，KV 快取目前攪珠資料
 - Worker 單元測試、結構化 logging 及容錯處理；官方金額可包含 `$`、`HK$` 及千位分隔，金額暫時無效時仍會保存有效攪珠結果
@@ -111,8 +111,9 @@ Production environment 使用：
 - KV binding：`DRAW_CACHE`
 - D1 binding：`DB`
 - 通知 Cron：`15 1 * * SUN,TUE,THU,SAT`（UTC，即香港時間 09:15）
-- 結果 Cron：`39 13 * * SUN,TUE,THU,SAT`（UTC，即香港時間 21:39）
-- 後備結果 Cron：`49 13 * * SUN,TUE,THU,SAT`（UTC，即香港時間 21:49）
+- 結果 Cron：`40 13 * * SUN,TUE,THU,SAT`（UTC，即香港時間 21:40）
+- 後備結果 Cron：`50 13 * * SUN,TUE,THU,SAT`（UTC，即香港時間 21:50）
+- 晚間補充 Cron：`0 14 * * SUN,TUE,THU,SAT`（UTC，即香港時間 22:00）
 
 必須設定以下 secrets：
 
@@ -120,7 +121,12 @@ Production environment 使用：
 APNS_KEY_ID
 APNS_TEAM_ID
 APNS_PRIVATE_KEY
+APNS_SANDBOX_KEY_ID
+APNS_SANDBOX_PRIVATE_KEY
 ```
+
+`APNS_KEY_ID` 與 `APNS_PRIVATE_KEY` 用於 production APNs；`APNS_SANDBOX_KEY_ID` 與
+`APNS_SANDBOX_PRIVATE_KEY` 用於 Xcode Debug 安裝所使用的 sandbox APNs。Team ID 與 topic 共用。
 
 部署及資料庫 migration：
 

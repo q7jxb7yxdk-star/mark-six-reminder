@@ -288,11 +288,12 @@ Cron：
 
 ```text
 15 1 * * SUN,TUE,THU,SAT
-39 13 * * SUN,TUE,THU,SAT
-49 13 * * SUN,TUE,THU,SAT
+40 13 * * SUN,TUE,THU,SAT
+50 13 * * SUN,TUE,THU,SAT
+0 14 * * SUN,TUE,THU,SAT
 ```
 
-Cloudflare Cron 使用 UTC。以上分別等同香港時間逢星期日、星期二、星期四及星期六 09:15、21:39 及 21:49。09:15 排程更新資料及判斷 APNs 通知；21:39 排程更新攪珠結果；21:49 是官方結果延遲時的後備重試。兩個晚間排程只更新 D1/KV，不會發送頭獎基金通知；App 會分別於 21:40 及 21:50 讀取更新後資料。
+Cloudflare Cron 使用 UTC。以上分別等同香港時間逢星期日、星期二、星期四及星期六 09:15、21:40、21:50 及 22:00。09:15 排程更新資料及判斷 APNs 通知；三個晚間排程更新攪珠結果與最新估計頭獎基金，其中 21:50 及 22:00 亦處理官方資料延遲。晚間排程只更新 D1/KV，不會發送頭獎基金通知；App 會於 21:40 及 21:50 強制讀取最新資料，用戶亦可下拉重新整理。
 
 Worker 只會在這四個可能的攪珠星期執行；通知服務仍會比較官方 `drawDate` 與香港當日日期，因此沒有攪珠的星期六或星期日不會發送通知。
 
@@ -429,7 +430,13 @@ APNS_TOPIC
 APNS_KEY_ID
 APNS_TEAM_ID
 APNS_PRIVATE_KEY
+APNS_SANDBOX_KEY_ID
+APNS_SANDBOX_PRIVATE_KEY
 ```
+
+`APNS_KEY_ID` 與 `APNS_PRIVATE_KEY` 是 production APNs credentials；
+`APNS_SANDBOX_KEY_ID` 與 `APNS_SANDBOX_PRIVATE_KEY` 是 sandbox APNs credentials。
+兩個環境共用 `APNS_TEAM_ID` 及 `APNS_TOPIC`，但使用獨立 provider token 與 APNs endpoint。
 
 設定方式：
 
@@ -438,6 +445,8 @@ cd Worker
 npx wrangler secret put APNS_KEY_ID --env production
 npx wrangler secret put APNS_TEAM_ID --env production
 npx wrangler secret put APNS_PRIVATE_KEY --env production
+npx wrangler secret put APNS_SANDBOX_KEY_ID --env production
+npx wrangler secret put APNS_SANDBOX_PRIVATE_KEY --env production
 ```
 
 `.p8` 私鑰只可在 Apple Developer 下載一次。不要把私鑰、secret 值、`.dev.vars` 或 APNs token 提交到 Git、加入文件或寫入 log。
@@ -458,6 +467,7 @@ npm run check
 - source client request/query 行為
 - draw update 的 source-to-store 流程
 - draw-day、門檻、缺少 APNs 及 once-per-draw 通知行為
+- sandbox／production APNs endpoint、Key ID 及 provider token 分流
 
 ### 10.2 D1 migration
 
@@ -475,7 +485,7 @@ cd Worker
 npx wrangler deploy --env production
 ```
 
-Production 啟用 09:15、21:39 及 21:49（香港時間）的自動更新排程。部署後檢查：
+Production 啟用 09:15、21:40、21:50 及 22:00（香港時間）的自動更新排程。部署後檢查：
 
 ```bash
 curl https://mark-six-reminder-api.sonicman.workers.dev/health
